@@ -1,0 +1,52 @@
+{
+  "name": "Bus Ride App",
+  "short_name": "BusRideApp",
+  "description": "Unified virtual bus and intercity ridesharing network connecting regional bus stations across Amhara, Ethiopia.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#064e3b",
+  "theme_color": "#047857",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["travel", "transportation", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Book Ticket",
+      "url": "/?tab=booking",
+      "description": "Book intercity bus seats across Amhara"
+    },
+    {
+      "name": "Live Radar",
+      "url": "/?tab=tracker",
+      "description": "Track active buses on regional routes"
+    }
+  ]
+}

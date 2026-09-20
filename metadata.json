@@ -1,0 +1,6 @@
+{
+  "name": "Bus Ride App",
+  "description": "Virtual bus transport and intercity ridesharing network connecting all major bus stations across the Amhara region of Ethiopia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
