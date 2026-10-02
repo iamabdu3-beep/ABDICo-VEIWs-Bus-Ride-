@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RideTrip, BusStation, Language } from '../types';
 import { AMHARA_STATIONS } from '../data/amharaStations';
 import { translations } from '../translations';
+import { calculateDynamicArrivalEstimate, DynamicArrivalEstimate } from '../utils/arrivalEstimator';
 import {
   Radio,
   Bus,
@@ -15,6 +16,10 @@ import {
   Pause,
   RotateCcw,
   Navigation,
+  Sparkles,
+  TrendingUp,
+  Activity,
+  Zap,
 } from 'lucide-react';
 
 interface LiveBusTrackerProps {
@@ -71,6 +76,26 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
   }, [isSimulating]);
 
   const getStationById = (id: string) => AMHARA_STATIONS.find((s) => s.id === id);
+
+  const fleetAvgSpeed = useMemo(() => {
+    if (telemetry.length === 0) return '65.0';
+    const sum = telemetry.reduce((acc, curr) => acc + curr.speed, 0);
+    return (sum / telemetry.length).toFixed(1);
+  }, [telemetry]);
+
+  const fleetEstimates = useMemo(() => {
+    return telemetry
+      .map((item) => {
+        const trip = trips.find((t) => t.id === item.tripId);
+        if (!trip) return null;
+        return calculateDynamicArrivalEstimate(trip, item.progress, item.speed);
+      })
+      .filter(Boolean) as DynamicArrivalEstimate[];
+  }, [telemetry, trips]);
+
+  const fleetAheadCount = fleetEstimates.filter((e) => e.status === 'ahead').length;
+  const fleetDelayedCount = fleetEstimates.filter((e) => e.status === 'delayed').length;
+  const fleetOnTimeCount = fleetEstimates.filter((e) => e.status === 'on_time').length;
 
   return (
     <div className="space-y-5">
@@ -140,10 +165,22 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
 
           <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
             <span className="text-[11px] text-slate-400 block">
-              {lang === 'en' ? 'Average Highway Speed' : 'አማካኝ የፍጥነት መጠን'}
+              {lang === 'en' ? 'Fleet Average Speed' : 'አማካኝ የፍጥነት መጠን'}
             </span>
             <span className="text-lg font-bold text-amber-400 font-mono">
-              66.5 km/h
+              {fleetAvgSpeed} km/h
+            </span>
+          </div>
+
+          <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+            <span className="text-[11px] text-slate-400 block">
+              {lang === 'en' ? 'Dynamic ETA Status' : 'የመድረሻ ሰዓት ሁኔታ'}
+            </span>
+            <span className="text-sm font-bold text-cyan-300 font-mono flex items-center gap-1 mt-1">
+              <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+              <span>
+                {fleetAheadCount} {lang === 'en' ? 'Ahead' : 'ቀድሞ'} • {fleetOnTimeCount} {lang === 'en' ? 'On Time' : 'በሰዓቱ'}
+              </span>
             </span>
           </div>
 
@@ -151,18 +188,9 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
             <span className="text-[11px] text-slate-400 block">
               {lang === 'en' ? 'High Altitude Mountain Pass' : 'ከፍተኛው የተራራ ማለፊያ'}
             </span>
-            <span className="text-lg font-bold text-cyan-400 font-mono">
-              Termaber (3,120m)
-            </span>
-          </div>
-
-          <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
-            <span className="text-[11px] text-slate-400 block">
-              {lang === 'en' ? 'Dispatch Security Status' : 'የትራንስፖርት ደህንነት'}
-            </span>
-            <span className="text-lg font-bold text-emerald-400 flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Normal 100%</span>
+            <span className="text-sm font-bold text-emerald-400 flex items-center gap-1 mt-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Termaber (3,120m) Pass</span>
             </span>
           </div>
         </div>
@@ -176,6 +204,7 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
 
           const s1 = getStationById(trip.fromStationId);
           const s2 = getStationById(trip.toStationId);
+          const arrivalEst = calculateDynamicArrivalEstimate(trip, item.progress, item.speed);
 
           return (
             <div
@@ -252,6 +281,131 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                     className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-700"
                     style={{ width: `${item.progress}%` }}
                   />
+                </div>
+              </div>
+
+              {/* Dynamic Live Arrival Estimate Container */}
+              <div className="bg-gradient-to-br from-slate-900 via-neutral-900 to-slate-950 text-white rounded-xl p-3.5 border border-slate-800 space-y-2.5 shadow-inner">
+                {/* Header row: Live Expected Arrival Time & Status Variance Pill */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4 animate-spin" style={{ animationDuration: '10s' }} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
+                        {lang === 'en' ? 'Live Dynamic Arrival ETA' : 'ተለዋዋጭ የቀጥታ መድረሻ ሰዓት'}
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-black text-white font-mono tracking-tight">
+                          {arrivalEst.dynamicExpectedArrivalTime}
+                        </span>
+                        <span
+                          className="text-[11px] text-slate-400 font-mono line-through"
+                          title={
+                            lang === 'en'
+                              ? 'Original scheduled timetable arrival'
+                              : 'ኦሪጅናል የመርሐግብር መድረሻ ሰዓት'
+                          }
+                        >
+                          Sched: {arrivalEst.scheduledArrivalTime}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Variance Badge */}
+                  <div className="text-right">
+                    <div
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                        arrivalEst.status === 'ahead'
+                          ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
+                          : arrivalEst.status === 'delayed'
+                          ? 'bg-amber-950 text-amber-300 border-amber-500/40'
+                          : 'bg-teal-950 text-teal-300 border-teal-500/40'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          arrivalEst.status === 'ahead'
+                            ? 'bg-emerald-400 animate-pulse'
+                            : arrivalEst.status === 'delayed'
+                            ? 'bg-amber-400 animate-pulse'
+                            : 'bg-teal-400'
+                        }`}
+                      />
+                      <span>
+                        {lang === 'en'
+                          ? arrivalEst.statusLabelEn
+                          : arrivalEst.statusLabelAm}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                      ~{arrivalEst.estimatedRemainingFormatted}{' '}
+                      {lang === 'en' ? 'remaining' : 'ቀሪ'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Historical Speed Model Breakdown Bar */}
+                <div className="bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/60 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">
+                      {lang === 'en' ? 'Route Hist. Average' : 'የመስመሩ የቀደመ አማካኝ'}
+                    </span>
+                    <span className="font-mono font-bold text-amber-300">
+                      {arrivalEst.historicalAvgSpeedKmH} km/h
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">
+                      {lang === 'en' ? 'Live Telemetry Speed' : 'የአሁኑ የቀጥታ ፍጥነት'}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono font-bold text-emerald-400">
+                        {item.speed} km/h
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono font-semibold ${
+                          arrivalEst.speedDeltaKmH >= 0
+                            ? 'text-emerald-400'
+                            : 'text-rose-400'
+                        }`}
+                        title={
+                          lang === 'en'
+                            ? 'Speed variance compared to route historical baseline'
+                            : 'ከቀደመው አማካኝ ፍጥነት ጋር ያለው ልዩነት'
+                        }
+                      >
+                        ({arrivalEst.speedDeltaKmH >= 0 ? `+${arrivalEst.speedDeltaKmH}` : arrivalEst.speedDeltaKmH})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-slate-400 block">
+                      {lang === 'en' ? 'Remaining to Terminal' : 'እስከ መናኸሪያው ቀሪ ርቀት'}
+                    </span>
+                    <span className="font-mono font-bold text-slate-200">
+                      {arrivalEst.remainingDistanceKm} km / {arrivalEst.totalDistanceKm} km
+                    </span>
+                  </div>
+                </div>
+
+                {/* Algorithmic corridor note */}
+                <div className="flex items-center justify-between text-[10px] text-slate-400 px-0.5 pt-0.5 border-t border-slate-800/70">
+                  <span className="flex items-center gap-1 truncate max-w-[85%]">
+                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span className="truncate">
+                      {lang === 'en'
+                        ? `ETA adjusted via ${arrivalEst.historicalAvgSpeedKmH} km/h corridor baseline (${arrivalEst.speedCategoryEn})`
+                        : `የመድረሻ ሰዓት በ${arrivalEst.historicalAvgSpeedKmH} ኪሜ/ሰ አማካኝ ፍጥነት ተሰልቷል (${arrivalEst.speedCategoryAm})`}
+                    </span>
+                  </span>
+                  <span className="font-mono text-emerald-400 font-semibold shrink-0">
+                    Δ{Math.abs(arrivalEst.varianceMinutes)}m
+                  </span>
                 </div>
               </div>
 

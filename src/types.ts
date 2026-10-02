@@ -1,5 +1,15 @@
 export type Language = 'en' | 'am';
 
+export type StationHierarchyTier = 'federal' | 'regional' | 'zonal' | 'woreda';
+
+export type InterconnectCorridorType =
+  | 'Federal-to-Regional'
+  | 'Regional-to-Zonal'
+  | 'Zonal-to-Woreda'
+  | 'Inter-Regional'
+  | 'Inter-Zonal'
+  | 'Woreda-Local';
+
 export type ZoneName =
   | 'West Gojjam'
   | 'East Gojjam'
@@ -11,7 +21,29 @@ export type ZoneName =
   | 'North Shewa'
   | 'Awi'
   | 'Wag Hemra'
-  | 'Addis Ababa Gateway';
+  | 'Addis Ababa Gateway'
+  | 'Federal Capital'
+  | 'East Shewa'
+  | 'West Shewa'
+  | 'Jimma Zone'
+  | 'West Arsi'
+  | 'Arsi'
+  | 'East Wollega'
+  | 'North Western Tigray'
+  | 'Eastern Tigray'
+  | 'Sidama Central'
+  | 'Gedeo'
+  | 'Wolaita'
+  | 'Hadiya'
+  | 'Harari Zone'
+  | 'Dire Dawa Administrative'
+  | 'Awsi Rasu (Zone 1)'
+  | 'Fafan Zone'
+  | 'Assosa Zone'
+  | 'Gamo Zone'
+  | 'Gambela Zone'
+  | 'Gurage Zone'
+  | string;
 
 export interface BusStation {
   id: string;
@@ -21,8 +53,21 @@ export interface BusStation {
   cityAm: string;
   zone: ZoneName;
   zoneAm: string;
+  hierarchyTier?: StationHierarchyTier;
+  regionName?: string;
+  regionNameAm?: string;
+  woredaName?: string;
+  woredaNameAm?: string;
+  parentHubId?: string; // e.g. Woreda -> Zonal Hub, Zonal -> Regional Capital, Regional -> Federal Hub
+  parentHubName?: string;
+  parentHubNameAm?: string;
+  connectedStationIds?: string[];
+  interconnectType?: InterconnectCorridorType;
+  transferLinesCount?: number;
   x: number; // Percentage coordinate on regional map 0-100
   y: number; // Percentage coordinate on regional map 0-100
+  lat: number; // Real GPS Latitude
+  lng: number; // Real GPS Longitude
   elevationM: number;
   baysCount: number;
   phone: string;
@@ -169,6 +214,18 @@ export interface BookingTicket {
   qrPayload: string;
   status: 'confirmed' | 'boarded' | 'completed' | 'cancelled';
   feedback?: TripFeedback;
+  ussdCode?: string;
+  callCenterNumber?: string;
+  callCenterHours?: string;
+  callCenterDispatch?: string;
+  multiLegGroupId?: string;
+  legIndex?: number;
+  totalLegs?: number;
+  transferStationName?: string;
+  transferStationNameAm?: string;
+  layoverDurationMinutes?: number;
+  connectingTicketId?: string;
+  masterTransactionRef?: string;
 }
 
 export interface ChatMessage {
@@ -234,7 +291,37 @@ export interface TerminalTrafficStatus {
   corridorsAffected: string[];
 }
 
-export type UserRole = 'passenger' | 'driver' | 'admin';
+export type UserRole = 'passenger' | 'driver' | 'bus_owner' | 'admin';
+
+export interface FleetVehicle {
+  plateNumber: string;
+  model: string;
+  category: VehicleCategory;
+  year: number;
+  totalSeats: number;
+  activeDriverName: string;
+  activeDriverPhone: string;
+  currentRoute: string;
+  status: 'on_route' | 'boarding' | 'maintenance' | 'idle';
+  occupancyPercent: number;
+  fuelLevelPercent: number;
+  odometerKm: number;
+  nextInspectionDate: string;
+  insurancePolicy: string;
+  revenueTodayETB: number;
+}
+
+export interface OperatorFinancialSummary {
+  todayGrossETB: number;
+  weeklyGrossETB: number;
+  monthlyGrossETB: number;
+  fuelExpenseETB: number;
+  driverAllowancesETB: number;
+  terminalTariffETB: number;
+  netProfitETB: number;
+  ticketsSoldToday: number;
+  avgTicketPriceETB: number;
+}
 
 export interface UserProfile {
   id: string;
@@ -255,6 +342,15 @@ export interface UserProfile {
   terminalBaseAm?: string;
   totalTripsCompleted?: number;
   safetyScorePercent?: number;
+  // Bus Owner specific properties
+  busOwnerCompanyName?: string;
+  busOwnerCompanyNameAm?: string;
+  fleetSize?: number;
+  operatorLicenseNumber?: string;
+  registeredVehicles?: string[];
+  businessRegistrationNo?: string;
+  totalRevenueETB?: number;
+  bankAccountPayoutRef?: string;
   // Administration specific properties
   adminStaffId?: string;
   adminDepartment?: string;
@@ -300,4 +396,145 @@ export interface AdminAlertNotice {
   targetStations: string[]; // station IDs or 'all'
   isActive: boolean;
 }
+
+export type WeatherAlertSeverity = 'Extreme' | 'Severe' | 'Moderate';
+
+export interface WeatherAlert {
+  id: string;
+  stationId: string;
+  stationName: string;
+  stationNameAm: string;
+  regionZone: string;
+  regionZoneAm: string;
+  severity: WeatherAlertSeverity;
+  eventType: 'DENSE_MOUNTAIN_FOG' | 'TORRENTIAL_RAIN' | 'FLASH_FLOOD_WATCH' | 'HIGH_ALTITUDE_FROST' | 'SEVERE_THUNDERSTORM' | 'LANDSLIDE_RISK';
+  eventTitle: string;
+  eventTitleAm: string;
+  description: string;
+  descriptionAm: string;
+  safetyRecommendations: string[];
+  safetyRecommendationsAm: string[];
+  expectedDelayMin: number;
+  corridorHighway: string;
+  dataSource: {
+    name: string;
+    authorityUri: string;
+  };
+  startTime: string;
+  expirationTime: string;
+  isActive: boolean;
+  affectedRole: 'origin' | 'destination' | 'both';
+}
+
+export type TerminalDisruptionType =
+  | 'UNEXPECTED_DELAY'
+  | 'TERMINAL_CANCELLATION'
+  | 'WEATHER_HOLD'
+  | 'ROAD_CLOSURE'
+  | 'SECURITY_RESTRICTION';
+
+export type TerminalOperationalStatus = 'normal' | 'delayed' | 'cancelled' | 'restricted';
+
+export interface TerminalDisruptionAlert {
+  id: string;
+  terminalId: string;
+  terminalName: string;
+  terminalNameAm: string;
+  city: string;
+  cityAm: string;
+  type: TerminalDisruptionType;
+  severity: 'critical' | 'major' | 'moderate';
+  status: TerminalOperationalStatus;
+  headlineEn: string;
+  headlineAm: string;
+  detailEn: string;
+  detailAm: string;
+  expectedDelayMinutes?: number;
+  estimatedResolutionTime?: string;
+  affectedCorridors: string[];
+  recommendedActionEn: string;
+  recommendedActionAm: string;
+  isTerminalWide: boolean;
+  reportedAt: string;
+  updatedAt: string;
+  isActive: boolean;
+  issuedByAuthority: string;
+}
+
+export interface PreferredTerminalSettings {
+  preferredTerminalId: string;
+  notifyOnDelays: boolean;
+  notifyOnCancellations: boolean;
+  soundEnabled: boolean;
+  browserNotificationsEnabled: boolean;
+}
+
+export type TripPlanSortOption = 'fastest' | 'cheapest' | 'fewest_transfers' | 'scenic';
+
+export interface PlannedTripLeg {
+  id: string;
+  fromStation: BusStation;
+  toStation: BusStation;
+  departureTime: string;
+  arrivalTime: string;
+  durationFormatted: string;
+  durationMinutes: number;
+  distanceKm: number;
+  priceETB: number;
+  vehicleType: VehicleCategory;
+  operatorName: string;
+  operatorNameAm: string;
+  highwayCode: string;
+  terrain: string;
+  terrainAm: string;
+  scenicPoints: string[];
+  matchedTripId?: string;
+  matchedOfferId?: string;
+  bayNumber?: number;
+  layoverAfterMinutes?: number;
+  layoverStation?: BusStation;
+}
+
+export interface PlannedTripItinerary {
+  id: string;
+  title: string;
+  titleAm: string;
+  originStation: BusStation;
+  destStation: BusStation;
+  viaStation?: BusStation;
+  legs: PlannedTripLeg[];
+  totalDurationMinutes: number;
+  totalDurationFormatted: string;
+  totalDistanceKm: number;
+  totalFareETB: number;
+  transferCount: number;
+  departureTime: string;
+  arrivalTime: string;
+  categoryTag: 'fastest' | 'cheapest' | 'scenic' | 'comfort' | 'early_bird';
+  scenicHighlights: string[];
+  elevationMinM: number;
+  elevationMaxM: number;
+  co2EstimateKg: number;
+  routeRoadTypes: string[];
+  weatherWarningCount?: number;
+}
+
+export interface SavedTripPlan {
+  id: string;
+  savedAt: string;
+  travelDate: string;
+  passengerCount: number;
+  itinerary: PlannedTripItinerary;
+  customNotes?: string;
+}
+
+export type AppCategory = 'users' | 'driver' | 'administration' | 'business_owners';
+
+export type UserModule = 'booking' | 'planner' | 'interconnect' | 'map' | 'tracker' | 'directory' | 'carpool' | 'tickets';
+export type DriverModule = 'cockpit' | 'manifest' | 'safety_check' | 'incident' | 'comm' | 'badges';
+export type AdminModule = 'traffic_radar' | 'alerts_broadcast' | 'bays_control' | 'corridors_audit' | 'weather_monitor';
+export type OwnerModule = 'fleet' | 'financials' | 'dispatch_trip' | 'roster' | 'company_profile';
+
+export type AppModule = UserModule | DriverModule | AdminModule | OwnerModule;
+
 

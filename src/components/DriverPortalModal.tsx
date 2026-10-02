@@ -18,6 +18,17 @@ import {
   MapPin,
   FileCheck2,
   Car,
+  Award,
+  Star,
+  ThumbsUp,
+  HeartHandshake,
+  Trophy,
+  Copy,
+  Check,
+  Zap,
+  TrendingUp,
+  Share2,
+  ChevronRight,
 } from 'lucide-react';
 import { Language, UserProfile, PassengerManifestItem, VehicleReadinessChecklist, RideTrip } from '../types';
 import { INITIAL_DRIVER_MANIFEST, INITIAL_VEHICLE_CHECKLIST } from '../data/mockUsers';
@@ -30,6 +41,7 @@ interface DriverPortalModalProps {
   driver: UserProfile;
   activeTrip?: RideTrip | null;
   onLogout: () => void;
+  initialSubTab?: 'manifest' | 'checklist' | 'telemetry' | 'badges';
 }
 
 export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
@@ -39,6 +51,7 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
   driver,
   activeTrip,
   onLogout,
+  initialSubTab = 'manifest',
 }) => {
   const [manifest, setManifest] = useState<PassengerManifestItem[]>(INITIAL_DRIVER_MANIFEST);
   const [checklist, setChecklist] = useState<VehicleReadinessChecklist>(INITIAL_VEHICLE_CHECKLIST);
@@ -48,11 +61,184 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
   const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
   const [delayNotice, setDelayNotice] = useState<string>('');
   const [delaySubmitted, setDelaySubmitted] = useState<boolean>(false);
-  const [activeSubTab, setActiveSubTab] = useState<'manifest' | 'checklist' | 'telemetry'>('manifest');
+  const [activeSubTab, setActiveSubTab] = useState<'manifest' | 'checklist' | 'telemetry' | 'badges'>(
+    initialSubTab || 'manifest'
+  );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab, isOpen]);
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'top_rated' | 'safe_driver' | 'punctuality_pro'>('all');
+  const [copiedCredentials, setCopiedCredentials] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
   const isAm = lang === 'am';
+
+  const driverRating = driver.rating || 4.9;
+  const driverSafety = driver.safetyScorePercent || 99.4;
+  const driverTrips = driver.totalTripsCompleted || 420;
+  const onTimeScore = 97.8;
+  const reviewCount = 384;
+
+  const handleCopyCredentials = () => {
+    triggerHaptic(12);
+    const credentials = `Amhara Regional Transport Authority - Verified Driver Credentials
+Driver: ${driver.fullName} (${driver.fullNameAm || ''})
+License: ${driver.driverLicenseNumber || 'CDL-DRIVER'}
+Company: ${driver.companyName || 'Selam Bus Line SC'}
+Vehicle Plate: ${driver.assignedPlateNumber || 'ET 03-A88219'}
+Rating: ${driverRating} / 5.0 (${reviewCount} Passenger Reviews)
+Safety Telemetry Score: ${driverSafety}% (0 Incidents)
+On-Time Dispatch: ${onTimeScore}%
+Verified Badges:
+1. [Top Rated Driver] ${driverRating} ★ - Gold Tier Passenger Choice
+2. [Safe Driver Master] ${driverSafety}% - Zero Highway Violations
+3. [Punctuality Pro] ${onTimeScore}% - Prompt Gate Clearance
+Authority Verification: Amhara Regional Transport & Road Safety Bureau`;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(credentials);
+    }
+    setCopiedCredentials(true);
+    setTimeout(() => setCopiedCredentials(false), 3000);
+  };
+
+  const performanceBadges = [
+    {
+      id: 'top_rated' as const,
+      titleEn: 'Top Rated Driver',
+      titleAm: 'ምርጥ ደረጃ የተሰጠው አሽከርካሪ',
+      badgeLevelEn: 'Gold Tier • Elite Passenger Choice',
+      badgeLevelAm: 'ወርቅ ደረጃ • የተሳፋሪዎች ተመራጭ',
+      icon: Trophy,
+      colorGradient: 'from-amber-500 to-amber-600',
+      badgeBg: 'bg-amber-50 border-amber-300 text-amber-900',
+      badgeIconColor: 'text-amber-600',
+      metricScore: `${driverRating} ★`,
+      metricLabelEn: 'Overall Rating',
+      metricLabelAm: 'አጠቃላይ ደረጃ',
+      criteriaEn: 'Maintains rating above 4.8 / 5.0 with over 95% 5-star passenger reviews',
+      criteriaAm: 'ከ 4.8 በላይ አማካይ ውጤት እና ከ 95% በላይ ባለ 5-ኮከብ የተሳፋሪዎች ደረጃ',
+      status: 'active',
+      passengersEndorsed: 372,
+      tags: ['#1 in Tana Sector', 'Smooth Highway Curves', 'Polite & Respectful'],
+      tagsAm: ['በጣና ቀጠና #1', 'ለስላሳ የተራራ አነዳድ', 'ትሁትና አክባሪ'],
+    },
+    {
+      id: 'safe_driver' as const,
+      titleEn: 'Safe Driver Master',
+      titleAm: 'አስተማማኝና ጥንቃቄ ያለው አሽከርካሪ',
+      badgeLevelEn: 'Authority Certified • 0 Incidents',
+      badgeLevelAm: 'በባለስልጣኑ የተረጋገጠ • 0 አደጋ',
+      icon: ShieldCheck,
+      colorGradient: 'from-emerald-500 to-emerald-600',
+      badgeBg: 'bg-emerald-50 border-emerald-300 text-emerald-900',
+      badgeIconColor: 'text-emerald-600',
+      metricScore: `${driverSafety}%`,
+      metricLabelEn: 'Safety & Compliance Score',
+      metricLabelAm: 'የደህንነትና የፍጥነት ውጤት',
+      criteriaEn: 'Strict speed limit compliance (<80 km/h) & zero road safety violations on mountain corridors',
+      criteriaAm: 'የፍጥነት ገደብን ሙሉ በሙሉ ማክበርና በተራራማ መንገዶች ላይ ምንም የትራፊክ ጥሰት አለመመዝገብ',
+      status: 'active',
+      passengersEndorsed: 381,
+      tags: ['Zero Sudden Braking', 'Simien Pass Certified', 'Pre-Trip Checklist Verified'],
+      tagsAm: ['ድንገተኛ ፍሬን የሌለበት', 'በሰሜን ተራሮች የተመሰገነ', 'የቅድመ ጉዞ ፍተሻ ሙሉ'],
+    },
+    {
+      id: 'punctuality_pro' as const,
+      titleEn: 'Punctuality Pro',
+      titleAm: 'ሰዓት አክባሪ ባለሙያ',
+      badgeLevelEn: 'Diamond Standard • Schedule Master',
+      badgeLevelAm: 'የሰዓት ቁጥጥር ባለሙያ • አንደኛ ደረጃ',
+      icon: Clock,
+      colorGradient: 'from-blue-500 to-blue-600',
+      badgeBg: 'bg-blue-50 border-blue-300 text-blue-900',
+      badgeIconColor: 'text-blue-600',
+      metricScore: `${onTimeScore}%`,
+      metricLabelEn: 'On-Time Terminal Dispatch',
+      metricLabelAm: 'በሰዓቱ የመነሳት ምጣኔ',
+      criteriaEn: 'Clears terminal bay within 5 minutes of scheduled departure time over 100+ trips',
+      criteriaAm: 'ከመናኸሪያው መጫኛ በር ከተያዘለት ሰዓት በ5 ደቂቃ ውስጥ 100% መነሳት',
+      status: 'active',
+      passengersEndorsed: 366,
+      tags: ['Prompt Gate Clearance', 'Accurate Corridor ETA', 'Fast Boarding Flow'],
+      tagsAm: ['ፈጣን የበር ማጽደቅ', 'ትክክለኛ የመድረሻ ሰዓት', 'ቀልጣፋ መሳፈር'],
+    },
+  ];
+
+  const passengerFeedbackList = [
+    {
+      id: 'fb-1',
+      passengerName: 'Abebe Bikila',
+      passengerNameAm: 'አበበ ቢቂላ',
+      routeEn: 'Bahir Dar ➔ Gondar (Azezo)',
+      routeAm: 'ባሕር ዳር ➔ ጎንደር (አዘዞ)',
+      rating: 5,
+      dateEn: 'Yesterday, 09:15 AM',
+      dateAm: 'ትላንት፣ 09:15 AM',
+      badgesEarned: ['top_rated', 'safe_driver'],
+      commentEn:
+        'Captain Kassahun is remarkably steady and calm. Even during rain near Lake Tana curves, the ride was silky smooth and relaxing.',
+      commentAm:
+        'ካፒቴን ካሳሁን በጣም የተረጋጋና አስተማማኝ አሽከርካሪ ነው። በጣና ሀይቅ አቅራቢያ ዝናብ በነበረበት ወቅት እንኳን ጉዞው እጅግ ምቹ ነበር።',
+      highlightTag: 'Safe Driving in Rain',
+      highlightTagAm: 'በዝናብ ወቅት ጥንቃቄ የተሞላበት',
+    },
+    {
+      id: 'fb-2',
+      passengerName: 'Hiwot Tadesse',
+      passengerNameAm: 'ሕይወት ታደሰ',
+      routeEn: 'Bahir Dar ➔ Dessie',
+      routeAm: 'ባሕር ዳር ➔ ደሴ',
+      rating: 5,
+      dateEn: '3 days ago',
+      dateAm: 'ከ 3 ቀናት በፊት',
+      badgesEarned: ['punctuality_pro'],
+      commentEn:
+        'The bus departed the terminal bay at exactly 06:30 AM on the dot. Arrived in Dessie 10 minutes ahead of scheduled time!',
+      commentAm:
+        'አውቶቡሱ ከጣና መናኸሪያ በትክክል በ 06:30 AM ተነሳ። ደሴ ቦሩ መናኸሪያም ከተያዘለት ሰዓት ቀድሞ በሰላም ደርሷል!',
+      highlightTag: 'Departed on the Dot',
+      highlightTagAm: 'በትክክለኛው ሰዓት የተነሳ',
+    },
+    {
+      id: 'fb-3',
+      passengerName: 'Mulugeta Assefa',
+      passengerNameAm: 'ሙሉጌታ አሰፋ',
+      routeEn: 'Debre Markos ➔ Bahir Dar',
+      routeAm: 'ደብረ ማርቆስ ➔ ባሕር ዳር',
+      rating: 5,
+      dateEn: 'May 18, 2026',
+      dateAm: 'ግንቦት 10 ቀን',
+      badgesEarned: ['safe_driver', 'top_rated'],
+      commentEn:
+        'Checked all passenger safety belts and luggage locks before embarking onto the mountain highway. Exemplary service.',
+      commentAm:
+        'ወደ ተራራማው አውራ ጎዳና ከመግባቱ በፊት የሁሉንም ተሳፋሪዎች የደህንነት ቀበቶና ሻንጣ መቆለፉን አረጋግጧል። ምሳሌ የሚሆን አገልግሎት።',
+      highlightTag: 'Safety & Belt Inspection',
+      highlightTagAm: 'የደህንነት ቀበቶ ቁጥጥር',
+    },
+    {
+      id: 'fb-4',
+      passengerName: 'Almaz Workineh',
+      passengerNameAm: 'አልማዝ ወርቅነህ',
+      routeEn: 'Gondar ➔ Bahir Dar',
+      routeAm: 'ጎንደር ➔ ባሕር ዳር',
+      rating: 5,
+      dateEn: 'May 12, 2026',
+      dateAm: 'ሚያዝያ 28 ቀን',
+      badgesEarned: ['top_rated', 'punctuality_pro'],
+      commentEn:
+        'Professional greeting, helped elderly travelers board safely, clean air conditioning throughout the ride.',
+      commentAm:
+        'በጣም ጨዋ አቀባበል፣ አረጋውያን ተሳፋሪዎችን በክብር አሳፍሯል፣ የአውቶቡሱ ውስጠኛ ክፍል እጅግ ንጹህ ነበር።',
+      highlightTag: 'Hospitality & Cleanliness',
+      highlightTagAm: 'ትህትናና ንጽሕና',
+    },
+  ];
 
   // Calculate passenger counts
   const totalPassengers = manifest.reduce((acc, p) => acc + p.seatNumbers.length, 0);
@@ -248,14 +434,84 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
           </div>
         </div>
 
-        {/* Sub-Tabs: Manifest | Inspection Checklist | En Route Telemetry */}
-        <div className="flex border-b border-neutral-200 bg-neutral-100 px-4 sm:px-6 shrink-0 gap-2">
+        {/* Driver Performance Badges Quick Bar */}
+        <div className="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-blue-500/10 border-b border-amber-200/80 px-4 sm:px-6 py-2 shrink-0 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider flex items-center gap-1">
+              <Award className="w-3.5 h-3.5 text-amber-600" />
+              <span>{isAm ? 'የሹፌሩ ደረጃዎች፡' : 'Driver Badges:'}</span>
+            </span>
+
+            {/* Top Rated Pill */}
+            <button
+              onClick={() => {
+                triggerHaptic(8);
+                setActiveSubTab('badges');
+                setBadgeFilter('top_rated');
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition cursor-pointer shadow-2xs"
+            >
+              <Trophy className="w-3 h-3 text-amber-600" />
+              <span>{isAm ? 'ምርጥ ደረጃ (Top Rated)' : 'Top Rated'}</span>
+              <span className="bg-amber-200 text-amber-950 px-1 py-0.2 rounded font-mono text-[10px]">
+                {driverRating} ★
+              </span>
+            </button>
+
+            {/* Safe Driver Pill */}
+            <button
+              onClick={() => {
+                triggerHaptic(8);
+                setActiveSubTab('badges');
+                setBadgeFilter('safe_driver');
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 hover:bg-emerald-200 transition cursor-pointer shadow-2xs"
+            >
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              <span>{isAm ? 'አስተማማኝ (Safe Driver)' : 'Safe Driver'}</span>
+              <span className="bg-emerald-200 text-emerald-950 px-1 py-0.2 rounded font-mono text-[10px]">
+                {driverSafety}%
+              </span>
+            </button>
+
+            {/* Punctuality Pro Pill */}
+            <button
+              onClick={() => {
+                triggerHaptic(8);
+                setActiveSubTab('badges');
+                setBadgeFilter('punctuality_pro');
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-900 border border-blue-300 hover:bg-blue-200 transition cursor-pointer shadow-2xs"
+            >
+              <Clock className="w-3 h-3 text-blue-600" />
+              <span>{isAm ? 'ሰዓት አክባሪ (Punctuality Pro)' : 'Punctuality Pro'}</span>
+              <span className="bg-blue-200 text-blue-950 px-1 py-0.2 rounded font-mono text-[10px]">
+                {onTimeScore}%
+              </span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              triggerHaptic(8);
+              setActiveSubTab('badges');
+              setBadgeFilter('all');
+            }}
+            className="text-[11px] font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 transition cursor-pointer"
+          >
+            <span>{isAm ? 'ሁሉንም ሜዳሊያዎች ይመልከቱ' : 'View Verified Badges & Feedback'}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Sub-Tabs: Manifest | Inspection Checklist | En Route Telemetry | Performance Badges */}
+        <div className="flex border-b border-neutral-200 bg-neutral-100 px-4 sm:px-6 shrink-0 gap-2 overflow-x-auto">
           <button
             onClick={() => {
               triggerHaptic(8);
               setActiveSubTab('manifest');
             }}
-            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer ${
+            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer shrink-0 ${
               activeSubTab === 'manifest'
                 ? 'border-amber-600 text-amber-900 bg-white'
                 : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -273,7 +529,7 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
               triggerHaptic(8);
               setActiveSubTab('checklist');
             }}
-            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer ${
+            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer shrink-0 ${
               activeSubTab === 'checklist'
                 ? 'border-amber-600 text-amber-900 bg-white'
                 : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -293,7 +549,7 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
               triggerHaptic(8);
               setActiveSubTab('telemetry');
             }}
-            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer ${
+            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer shrink-0 ${
               activeSubTab === 'telemetry'
                 ? 'border-amber-600 text-amber-900 bg-white'
                 : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -301,6 +557,25 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
           >
             <Gauge className="w-4 h-4 text-blue-600" />
             <span>{isAm ? 'የፍጥነትና መንገድ ሁኔታ' : 'Route & Road Telemetry'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              triggerHaptic(8);
+              setActiveSubTab('badges');
+            }}
+            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition cursor-pointer shrink-0 ${
+              activeSubTab === 'badges'
+                ? 'border-amber-600 text-amber-900 bg-white'
+                : 'border-transparent text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <Award className="w-4 h-4 text-amber-600" />
+            <span>{isAm ? 'የአፈጻጸም ሜዳሊያዎች' : 'Performance Badges'}</span>
+            <span className="bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-full text-[10px] font-bold flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+              3 Active
+            </span>
           </button>
         </div>
 
@@ -603,6 +878,408 @@ export const DriverPortalModal: React.FC<DriverPortalModalProps> = ({
                     <span>{isAm ? 'ማሳሰቢያው ለጣቢያ አስተዳደር ተልኳል!' : 'Advisory successfully transmitted to Regional Dispatch!'}</span>
                   </p>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: PERFORMANCE BADGES & PASSENGER COMMENDATIONS */}
+          {activeSubTab === 'badges' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {/* Driver Performance Hero Card */}
+              <div className="bg-gradient-to-br from-slate-900 via-amber-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-amber-500/30 shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                  <div className="flex items-center gap-3.5">
+                    <div className="relative shrink-0">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center font-black text-xl shadow-md border-2 border-amber-200">
+                        {driver.avatarBadge || 'KW'}
+                      </div>
+                      <div
+                        className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full border-2 border-slate-900"
+                        title="Verified Authority Operator"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-base sm:text-lg text-white">
+                          {isAm ? driver.fullNameAm : driver.fullName}
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1">
+                          <Trophy className="w-3 h-3 text-slate-950" />
+                          <span>{isAm ? 'ወርቅ ደረጃ አሽከርካሪ' : 'Gold Tier Operator'}</span>
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-200/90 mt-0.5">
+                        {driver.companyName} • {isAm ? driver.terminalBaseAm : driver.terminalBase}
+                      </p>
+                      <div className="flex items-center gap-2.5 mt-1.5 text-xs text-slate-300 font-medium flex-wrap">
+                        <span className="flex items-center gap-1 text-amber-400 font-bold font-mono">
+                          <Star className="w-3.5 h-3.5 fill-current" />
+                          <span>{driverRating} / 5.0</span>
+                        </span>
+                        <span>•</span>
+                        <span>{reviewCount} {isAm ? 'የተሳፋሪዎች አስተያየቶች' : 'Passenger Reviews'}</span>
+                        <span>•</span>
+                        <span className="text-emerald-400 font-semibold">98.6% {isAm ? 'አዎንታዊ' : 'Positive'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions & Copy Credentials */}
+                  <div className="flex items-center gap-2 sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyCredentials}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      {copiedCredentials ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-slate-950" />
+                          <span>{isAm ? 'ተቀድቷል!' : 'Credentials Copied!'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{isAm ? 'የአፈጻጸም ማስረጃ ቅዳ' : 'Copy Credentials'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Core Vital Performance Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-4 border-t border-white/10">
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-medium">
+                      {isAm ? 'የደህንነት ነጥብ' : 'Safety Score'}
+                    </span>
+                    <span className="text-lg font-black text-emerald-400 font-mono block mt-0.5">
+                      {driverSafety}%
+                    </span>
+                    <span className="text-[10px] text-emerald-300/80">
+                      {isAm ? '0 አደጋዎች (420 ጉዞዎች)' : '0 Incidents (420 Trips)'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-medium">
+                      {isAm ? 'በሰዓቱ መነሳት' : 'On-Time Dispatch'}
+                    </span>
+                    <span className="text-lg font-black text-blue-400 font-mono block mt-0.5">
+                      {onTimeScore}%
+                    </span>
+                    <span className="text-[10px] text-blue-300/80">
+                      {isAm ? 'የመጫኛ በር ቁጥጥር' : 'Within 5m Window'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-medium">
+                      {isAm ? 'የተጠናቀቁ ጉዞዎች' : 'Completed Trips'}
+                    </span>
+                    <span className="text-lg font-black text-amber-400 font-mono block mt-0.5">
+                      {driverTrips}
+                    </span>
+                    <span className="text-[10px] text-amber-300/80">
+                      {isAm ? 'በአማራ ክልል አውራ ጎዳናዎች' : 'Amhara Corridors'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-medium">
+                      {isAm ? 'የባለስልጣኑ ማረጋገጫ' : 'Authority Status'}
+                    </span>
+                    <span className="text-lg font-black text-white font-mono block mt-0.5">
+                      {isAm ? 'ንቁ ✅' : 'ACTIVE ✅'}
+                    </span>
+                    <span className="text-[10px] text-emerald-300/80">
+                      {isAm ? 'ወርሃዊ ቦነስ ብቁ' : 'Bonus Eligible'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Performance Badges Showcase */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-amber-600" />
+                      <span>
+                        {isAm
+                          ? 'ንቁ የአፈጻጸም ሜዳሊያዎች (3 የተረጋገጡ)'
+                          : 'Active Performance Badges (3 Verified)'}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      {isAm
+                        ? 'በተሳፋሪዎች አስተያየትና በአማራ ትራንስፖርት ባለስልጣን የቴሌሜትሪ መረጃ ላይ የተመሰረተ'
+                        : 'Calculated dynamically from passenger booking reviews and Regional GPS telemetry'}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full hidden sm:inline-flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{isAm ? 'ሁሉም መስፈርቶች ተሟልተዋል' : 'All Criteria Achieved'}</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {performanceBadges.map((badge) => {
+                    const Icon = badge.icon;
+                    return (
+                      <div
+                        key={badge.id}
+                        className={`p-4 rounded-2xl border transition-all duration-200 shadow-xs relative overflow-hidden flex flex-col justify-between ${badge.badgeBg}`}
+                      >
+                        <div className="absolute top-0 right-0 translate-x-2 -translate-y-2 opacity-10 pointer-events-none">
+                          <Icon className="w-24 h-24" />
+                        </div>
+
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-black/5 flex items-center justify-center">
+                              <Icon className={`w-5 h-5 ${badge.badgeIconColor}`} />
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/90 text-neutral-800 border border-black/10 shadow-2xs">
+                              {isAm ? badge.badgeLevelAm : badge.badgeLevelEn}
+                            </span>
+                          </div>
+
+                          <h4 className="font-bold text-sm text-neutral-900">
+                            {isAm ? badge.titleAm : badge.titleEn}
+                          </h4>
+                          <div className="flex items-baseline gap-1.5 my-1">
+                            <span className="text-xl font-black font-mono text-neutral-900">
+                              {badge.metricScore}
+                            </span>
+                            <span className="text-[11px] text-neutral-600 font-medium">
+                              {isAm ? badge.metricLabelAm : badge.metricLabelEn}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-neutral-700 mt-1 leading-relaxed">
+                            {isAm ? badge.criteriaAm : badge.criteriaEn}
+                          </p>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-black/10">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-600 block mb-1">
+                            {isAm ? 'የተሳፋሪዎች ምስጋናዎች' : 'Passenger Commendations'}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {(isAm ? badge.tagsAm : badge.tags).map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 text-[10px] font-semibold bg-white/80 text-neutral-800 rounded-md border border-black/5"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-neutral-500 mt-2 flex items-center gap-1">
+                            <ThumbsUp className="w-3 h-3 text-emerald-600" />
+                            <span>
+                              {badge.passengersEndorsed}{' '}
+                              {isAm
+                                ? 'ተሳፋሪዎች በዚህ መስፈርት መርቀውታል'
+                                : 'passengers endorsed this badge'}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Passenger Ratings Breakdown by Category */}
+              <div className="bg-white rounded-2xl p-4 border border-neutral-200 shadow-xs">
+                <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Star className="w-4 h-4 text-amber-500 fill-current" />
+                  <span>
+                    {isAm
+                      ? 'የተሳፋሪዎች ደረጃ አሰጣጥ በምድብ (384 ግምገማዎች)'
+                      : 'Passenger Feedback Ratings by Dimension (384 Reviews)'}
+                  </span>
+                </h3>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      labelEn: 'Punctuality & Gate Departure',
+                      labelAm: 'በሰዓቱ መነሳትና መድረስ',
+                      score: '4.9',
+                      percent: 98,
+                      color: 'bg-blue-600',
+                    },
+                    {
+                      labelEn: 'Smooth & Safe Mountain Corridor Driving',
+                      labelAm: 'የተረጋጋና ጥንቃቄ የተሞላበት የተራራ አነዳድ',
+                      score: '5.0',
+                      percent: 100,
+                      color: 'bg-emerald-600',
+                    },
+                    {
+                      labelEn: 'Cabin Cleanliness & Air Ventilation',
+                      labelAm: 'የአውቶቡስ ንጽሕናና ምቾት',
+                      score: '4.8',
+                      percent: 96,
+                      color: 'bg-amber-600',
+                    },
+                    {
+                      labelEn: 'Luggage Care & Careful Bay Stowage',
+                      labelAm: 'የሻንጣ አያያዝ ጥንቃቄና ደህንነት',
+                      score: '5.0',
+                      percent: 100,
+                      color: 'bg-purple-600',
+                    },
+                    {
+                      labelEn: 'Courtesy, Respect & Elderly Assistance',
+                      labelAm: 'ጨዋነት፣ አክብሮትና የተሳፋሪዎች እርዳታ',
+                      score: '4.9',
+                      percent: 98,
+                      color: 'bg-teal-600',
+                    },
+                  ].map((dim, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-neutral-800">
+                          {isAm ? dim.labelAm : dim.labelEn}
+                        </span>
+                        <span className="font-mono font-bold text-neutral-900">
+                          {dim.score} / 5.0 ({dim.percent}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-neutral-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${dim.color}`}
+                          style={{ width: `${dim.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Verified Passenger Commendations Feed */}
+              <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <HeartHandshake className="w-4 h-4 text-rose-500" />
+                      <span>
+                        {isAm
+                          ? 'የተሳፋሪዎች የቅርብ ጊዜ ምስጋናዎች'
+                          : 'Recent Verified Passenger Commendations'}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-neutral-500">
+                      {isAm
+                        ? 'ከኦንላይን ትኬት ቦታ ማስያዣ በኋላ በተሳፋሪዎች የተሰጡ አስተያየቶች'
+                        : 'Feedback submitted after ticket completion on Amhara Regional Corridors'}
+                    </p>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {[
+                      { id: 'all' as const, labelEn: 'All Reviews', labelAm: 'ሁሉም' },
+                      { id: 'top_rated' as const, labelEn: 'Top Rated', labelAm: 'ምርጥ ደረጃ' },
+                      { id: 'safe_driver' as const, labelEn: 'Safe Driver', labelAm: 'አስተማማኝ' },
+                      { id: 'punctuality_pro' as const, labelEn: 'Punctuality', labelAm: 'ሰዓት አክባሪ' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(8);
+                          setBadgeFilter(f.id);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          badgeFilter === f.id
+                            ? 'bg-neutral-900 text-white shadow-xs'
+                            : 'bg-white hover:bg-neutral-100 text-neutral-600 border border-neutral-200'
+                        }`}
+                      >
+                        {isAm ? f.labelAm : f.labelEn}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Feedback List */}
+                <div className="space-y-2.5">
+                  {passengerFeedbackList
+                    .filter((fb) => badgeFilter === 'all' || fb.badgesEarned.includes(badgeFilter))
+                    .map((fb) => (
+                      <div
+                        key={fb.id}
+                        className="p-3 bg-white rounded-xl border border-neutral-200 shadow-2xs hover:border-amber-300 transition"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xs">
+                              {fb.passengerName[0]}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-neutral-900">
+                                  {isAm ? fb.passengerNameAm : fb.passengerName}
+                                </span>
+                                <span className="text-[10px] text-neutral-400 font-medium">
+                                  {isAm ? fb.dateAm : fb.dateEn}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-neutral-500 block">
+                                {isAm ? fb.routeAm : fb.routeEn}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-amber-500">
+                            {[...Array(fb.rating)].map((_, i) => (
+                              <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                            ))}
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-neutral-700 italic my-1.5 leading-relaxed bg-neutral-50 p-2 rounded-lg border border-neutral-150">
+                          "{isAm ? fb.commentAm : fb.commentEn}"
+                        </p>
+
+                        <div className="flex items-center justify-between text-[11px] text-neutral-500 pt-1">
+                          <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+                            <Sparkles className="w-3 h-3 text-emerald-600" />
+                            <span>{isAm ? fb.highlightTagAm : fb.highlightTag}</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-neutral-400">
+                            Verified Passenger
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Regional Transport Authority Incentive Info */}
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 flex items-start gap-3 text-xs text-amber-950">
+                <Trophy className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-amber-950 mb-0.5">
+                    {isAm
+                      ? 'የአማራ ትራንስፖርት ባለስልጣን የሹፌሮች ማበረታቻ ቦነስ'
+                      : 'Amhara Transport Authority Regional Driver Bonus Qualified'}
+                  </h4>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    {isAm
+                      ? 'ካፒቴን ካሳሁን "Top Rated"፣ "Safe Driver" እና "Punctuality Pro" ደረጃዎችን በማሳካቱ የዚህ ወር የ15% የደህንነትና የሰዓት አከባበር ተጨማሪ አበል ተፈቅዶለታል።'
+                      : 'Holding active Top Rated, Safe Driver, and Punctuality Pro badges qualifies this operator for the 15% Authority Safety & Punctuality quarterly incentive dividend.'}
+                  </p>
+                </div>
               </div>
             </div>
           )}

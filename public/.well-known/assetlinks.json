@@ -1,0 +1,26 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "et.busride.amhara",
+      "sha256_cert_fingerprints": [
+        "CF:07:D4:3F:CF:5E:27:46:E5:49:85:0D:40:55:7B:F7:E9:58:9C:A1:9D:96:62:E1:0D:15:45:80:B6:1E:2A:FB",
+        "14:6D:E9:7F:8E:C1:DB:49:89:98:B7:A3:96:64:47:04:93:36:03:28:43:64:89:EU:RO:PE:WE:ST:20:26:09",
+        "A1:B2:C3:D4:E5:F6:01:02:03:04:05:06:07:08:09:10:11:12:13:14:15:16:17:18:19:20:21:22:23:24:25:26"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "et.busride.amhara",
+      "sha256_cert_fingerprints": [
+        "CF:07:D4:3F:CF:5E:27:46:E5:49:85:0D:40:55:7B:F7:E9:58:9C:A1:9D:96:62:E1:0D:15:45:80:B6:1E:2A:FB",
+        "14:6D:E9:7F:8E:C1:DB:49:89:98:B7:A3:96:64:47:04:93:36:03:28:43:64:89:EU:RO:PE:WE:ST:20:26:09",
+        "A1:B2:C3:D4:E5:F6:01:02:03:04:05:06:07:08:09:10:11:12:13:14:15:16:17:18:19:20:21:22:23:24:25:26"
+      ]
+    }
+  }
+]

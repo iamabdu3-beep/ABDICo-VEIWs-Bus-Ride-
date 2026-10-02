@@ -3,6 +3,7 @@ import { BusStation, RouteConnection, RideTrip, Language, TerminalTrafficStatus 
 import { AMHARA_STATIONS, ROUTE_CONNECTIONS } from '../data/amharaStations';
 import { BASE_TERMINAL_TRAFFIC, getCongestionConfig, getTerminalTraffic } from '../data/terminalTraffic';
 import { triggerHaptic } from '../utils/haptics';
+import { GoogleTransitMap } from './GoogleTransitMap';
 import {
   MapPin,
   Navigation,
@@ -25,6 +26,17 @@ import {
   CheckCircle2,
   Info,
   ChevronRight,
+  Map as MapIcon,
+  Download,
+  DownloadCloud,
+  Wifi,
+  WifiOff,
+  HardDrive,
+  Compass,
+  Copy,
+  Check,
+  Trash2,
+  Share2,
 } from 'lucide-react';
 
 interface StationMapProps {
@@ -36,6 +48,8 @@ interface StationMapProps {
   highlightFromId?: string;
   highlightToId?: string;
 }
+
+const OFFLINE_MAP_STORAGE_KEY = 'amhara_offline_regional_map_v1';
 
 export const StationMap: React.FC<StationMapProps> = ({
   lang,
@@ -53,6 +67,187 @@ export const StationMap: React.FC<StationMapProps> = ({
   );
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [hoveredStation, setHoveredStation] = useState<BusStation | null>(null);
+
+  // Map view mode: Google Maps (Real-world satellite/roads) vs Regional Schematic Grid
+  const [mapViewMode, setMapViewMode] = useState<'google' | 'schematic'>('google');
+
+  // Offline Regional Map Data & Cache State
+  const [isOfflineDownloaded, setIsOfflineDownloaded] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(OFFLINE_MAP_STORAGE_KEY) !== null;
+    }
+    return false;
+  });
+  const [offlineCachedDate, setOfflineCachedDate] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const item = localStorage.getItem(OFFLINE_MAP_STORAGE_KEY);
+        if (item) {
+          const parsed = JSON.parse(item);
+          return parsed.timestamp || null;
+        }
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [isDownloadingOffline, setIsDownloadingOffline] = useState<boolean>(false);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [offlineModeForced, setOfflineModeForced] = useState<boolean>(false);
+  const [isDeviceOnline, setIsDeviceOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  // User GPS Location for offline station distance & compass bearing
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocatingUser, setIsLocatingUser] = useState<boolean>(false);
+  const [copiedGps, setCopiedGps] = useState<boolean>(false);
+  const [offlineToastMessage, setOfflineToastMessage] = useState<string | null>(null);
+
+  // Online / Offline window listeners
+  useEffect(() => {
+    const handleOnline = () => setIsDeviceOnline(true);
+    const handleOffline = () => {
+      setIsDeviceOnline(false);
+      setMapViewMode('schematic');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Request passenger device GPS location
+  const handleRequestUserLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setUserLocation({ lat: 11.5936, lng: 37.3908 }); // Default to Bahir Dar
+      return;
+    }
+    triggerHaptic(10);
+    setIsLocatingUser(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+        setIsLocatingUser(false);
+        triggerHaptic(15);
+      },
+      () => {
+        setIsLocatingUser(false);
+        // Default to regional center if user denies permission
+        setUserLocation({ lat: 11.5936, lng: 37.3908 });
+      },
+      { timeout: 7000, enableHighAccuracy: true }
+    );
+  };
+
+  // Haversine formula to calculate km distance between passenger and station
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10;
+  };
+
+  // Calculate compass bearing
+  const calculateBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const y = Math.sin(((lon2 - lon1) * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180);
+    const x =
+      Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
+      Math.sin((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.cos(((lon2 - lon1) * Math.PI) / 180);
+    const brng = (Math.atan2(y, x) * 180) / Math.PI;
+    const compass = (brng + 360) % 360;
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const index = Math.round(compass / 45) % 8;
+    return `${Math.round(compass)}° ${directions[index]}`;
+  };
+
+  // Offline map download toggle handler
+  const handleToggleOfflineDownload = () => {
+    triggerHaptic(12);
+    if (isOfflineDownloaded) {
+      localStorage.removeItem(OFFLINE_MAP_STORAGE_KEY);
+      setIsOfflineDownloaded(false);
+      setOfflineCachedDate(null);
+      setOfflineModeForced(false);
+      setOfflineToastMessage(
+        lang === 'am'
+          ? 'ከመስመር ውጭ የተቀመጠው ካርታ ተሰርዟል'
+          : 'Offline map cache cleared from device storage.'
+      );
+      setTimeout(() => setOfflineToastMessage(null), 3500);
+      return;
+    }
+
+    setIsDownloadingOffline(true);
+    setDownloadProgress(20);
+
+    setTimeout(() => setDownloadProgress(55), 200);
+    setTimeout(() => setDownloadProgress(85), 450);
+    setTimeout(() => {
+      setDownloadProgress(100);
+      const payload = {
+        version: '1.0.0',
+        timestamp: new Date().toLocaleDateString(lang === 'am' ? 'am-ET' : 'en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        stationsCount: AMHARA_STATIONS.length,
+        stations: AMHARA_STATIONS,
+        connections: ROUTE_CONNECTIONS,
+        bundleSizeKb: 1420,
+      };
+
+      try {
+        localStorage.setItem(OFFLINE_MAP_STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn('Storage error:', err);
+      }
+
+      setIsOfflineDownloaded(true);
+      setOfflineCachedDate(payload.timestamp);
+      setIsDownloadingOffline(false);
+      setOfflineToastMessage(
+        lang === 'am'
+          ? 'የአማራ ክልል ካርታ ሙሉ መረጃ (15 መናኸሪያዎችና አውራ ጎዳናዎች) ያለ ኢንተርኔት እንዲሰራ በስልክዎ ተቀምጧል!'
+          : 'Amhara Regional Map data (15 terminals & corridors) successfully cached for offline navigation!'
+      );
+      setTimeout(() => setOfflineToastMessage(null), 4500);
+      triggerHaptic(20);
+    }, 700);
+  };
+
+  const handleCopyGps = (lat: number, lng: number) => {
+    triggerHaptic(10);
+    const text = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    setCopiedGps(true);
+    setTimeout(() => setCopiedGps(false), 2500);
+  };
+
+  const isOfflineActive = !isDeviceOnline || offlineModeForced;
+  const effectiveMapViewMode = isOfflineActive ? 'schematic' : mapViewMode;
 
   // Live traffic congestion overlay state
   const [showTrafficOverlay, setShowTrafficOverlay] = useState<boolean>(true);
@@ -167,27 +362,226 @@ export const StationMap: React.FC<StationMapProps> = ({
           </p>
         </div>
 
-        {/* Filter chips */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {zones.map((z) => (
+        {/* View Mode Switcher and Filter chips */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Offline Map Data Download Toggle Control */}
+          <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border border-neutral-200 shadow-xs">
+            {isDownloadingOffline ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-neutral-800 bg-amber-50 rounded-lg border border-amber-300">
+                <Download className="w-3.5 h-3.5 text-amber-600 animate-bounce" />
+                <span>
+                  {lang === 'en'
+                    ? `Downloading Map (${downloadProgress}%)...`
+                    : `ካርታውን በማውረድ ላይ (${downloadProgress}%)...`}
+                </span>
+                <div className="w-12 bg-neutral-200 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-500 h-full transition-all duration-200 rounded-full"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            ) : isOfflineDownloaded ? (
+              <div className="flex items-center gap-1">
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-200"
+                  title={
+                    lang === 'en'
+                      ? `Amhara map cached locally on ${offlineCachedDate || 'device'}`
+                      : 'የአማራ ካርታ በስልክዎ ላይ ተቀምጧል'
+                  }
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                  <span className="hidden sm:inline">
+                    {lang === 'en' ? 'Offline Map Cached' : 'ካርታው ተቀምጧል'}
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded">
+                    1.4 MB
+                  </span>
+                </div>
+
+                {/* Force Offline Nav Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    setOfflineModeForced(!offlineModeForced);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                    offlineModeForced
+                      ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-xs'
+                      : 'bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-200'
+                  }`}
+                  title={
+                    lang === 'en'
+                      ? 'Toggle Offline Navigation Mode (Zero Data)'
+                      : 'ከመስመር ውጭ አሰሳ ሞድ ማብሪያ/ማጥፊያ'
+                  }
+                >
+                  <WifiOff className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">
+                    {lang === 'en' ? 'Offline Mode' : 'ከመስመር ውጭ'}
+                  </span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      offlineModeForced ? 'bg-slate-950 animate-pulse' : 'bg-neutral-300'
+                    }`}
+                  />
+                </button>
+
+                {/* Delete cache button */}
+                <button
+                  type="button"
+                  onClick={handleToggleOfflineDownload}
+                  className="p-1.5 rounded-lg hover:bg-rose-50 text-neutral-400 hover:text-rose-600 transition cursor-pointer"
+                  title={lang === 'en' ? 'Clear cached offline map data' : 'የተቀመጠውን ካርታ ሰርዝ'}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleToggleOfflineDownload}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-xs cursor-pointer active:scale-95"
+                title={
+                  lang === 'en'
+                    ? 'Download Amhara regional map data for offline navigation without internet'
+                    : 'ያለ ኢንተርኔት ለመጠቀም የአማራ ክልል ካርታን አውርድ'
+                }
+              >
+                <DownloadCloud className="w-3.5 h-3.5 text-slate-950" />
+                <span>{lang === 'en' ? 'Download Offline Map' : 'ካርታውን አውርድ'}</span>
+                <span className="text-[10px] bg-slate-950/15 text-slate-950 px-1.5 py-0.2 rounded-full font-mono">
+                  1.4 MB
+                </span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border border-neutral-200 shadow-xs">
             <button
-              key={z.id}
-              onClick={() => setZoneFilter(z.id)}
-              className={`px-3 py-1 text-xs rounded-full border transition cursor-pointer ${
-                zoneFilter === z.id
-                  ? 'bg-emerald-700 text-white border-emerald-700 font-medium'
-                  : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100'
+              onClick={() => {
+                triggerHaptic(10);
+                setOfflineModeForced(false);
+                setMapViewMode('google');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                effectiveMapViewMode === 'google'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-neutral-700 hover:text-neutral-900'
               }`}
             >
-              {lang === 'en' ? z.nameEn : z.nameAm}
+              <MapIcon className="w-3.5 h-3.5 text-amber-300" />
+              <span>{lang === 'en' ? 'Google Maps (Live)' : 'ጉግል ካርታ (የቀጥታ)'}</span>
             </button>
-          ))}
+            <button
+              onClick={() => {
+                triggerHaptic(10);
+                setMapViewMode('schematic');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                effectiveMapViewMode === 'schematic'
+                  ? 'bg-neutral-800 text-white shadow-xs'
+                  : 'text-neutral-700 hover:text-neutral-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{lang === 'en' ? 'Schematic Grid' : 'የክልሉ ንድፍ ካርታ'}</span>
+            </button>
+          </div>
+
+          {/* Filter chips */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {zones.map((z) => (
+              <button
+                key={z.id}
+                onClick={() => setZoneFilter(z.id)}
+                className={`px-3 py-1 text-xs rounded-full border transition cursor-pointer ${
+                  zoneFilter === z.id
+                    ? 'bg-emerald-700 text-white border-emerald-700 font-medium'
+                    : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100'
+                }`}
+              >
+                {lang === 'en' ? z.nameEn : z.nameAm}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* Offline Toast Message Notification */}
+      {offlineToastMessage && (
+        <div className="p-3 rounded-2xl bg-emerald-900 text-white text-xs font-bold flex items-center justify-between gap-2 shadow-md animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{offlineToastMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOfflineToastMessage(null)}
+            className="p-1 text-emerald-300 hover:text-white"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Active Offline Navigation Banner */}
+      {isOfflineActive && (
+        <div className="p-3 rounded-2xl bg-amber-500 text-neutral-950 border border-amber-600 shadow-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-neutral-950 text-amber-300 flex items-center justify-center shrink-0">
+              <WifiOff className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-black text-xs block leading-tight">
+                {lang === 'en'
+                  ? 'Offline Regional Map Active • 15 Stations Cached'
+                  : 'ከመስመር ውጭ አሰሳ በርቷል • 15 መናኸሪያዎች በስልክዎ ተቀምጠዋል'}
+              </span>
+              <span className="text-[11px] opacity-90 block leading-tight mt-0.5">
+                {lang === 'en'
+                  ? 'All bus station terminals, GPS coordinates, highway connections, and emergency contacts are running offline.'
+                  : 'ሁሉም የመናኸሪያ ቦታዎች፣ የጂፒኤስ መጋጠሚያዎች፣ አውራ ጎዳናዎችና የአደጋ ጊዜ ስልኮች ያለ ኢንተርኔት ይሰራሉ።'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {offlineModeForced && (
+              <button
+                type="button"
+                onClick={() => setOfflineModeForced(false)}
+                className="px-2.5 py-1 bg-neutral-950 text-white hover:bg-neutral-800 rounded-lg text-xs font-bold transition cursor-pointer"
+              >
+                {lang === 'en' ? 'Exit Offline Mode' : 'ከመስመር ውጭ ውጣ'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* SVG Regional Vector Map (8 cols) */}
-        <div className="lg:col-span-8 bg-slate-900 rounded-2xl border border-neutral-800 shadow-md p-3 relative overflow-hidden">
+        {/* Map Container (8 cols) */}
+        <div className="lg:col-span-8 flex flex-col gap-3">
+          {effectiveMapViewMode === 'google' ? (
+            <GoogleTransitMap
+              lang={lang}
+              selectedStationId={activeStation?.id || selectedStationId}
+              onSelectStation={(st) => {
+                setActiveStation(st);
+                onSelectStation(st);
+              }}
+              onBookFromStation={onBookFromStation}
+              activeTrips={activeTrips}
+              highlightFromId={highlightFromId}
+              highlightToId={highlightToId}
+              trafficData={trafficData}
+              showTrafficOverlay={showTrafficOverlay}
+            />
+          ) : (
+            <div className="bg-slate-900 rounded-2xl border border-neutral-800 shadow-md p-3 relative overflow-hidden">
           {/* Top-bar map controls and live traffic toolbar */}
           <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
             {/* Left: Highway Code Legend */}
@@ -757,6 +1151,8 @@ export const StationMap: React.FC<StationMapProps> = ({
               </div>
             );
           })()}
+            </div>
+          )}
         </div>
 
         {/* Selected Station Inspection & Live Departure Board (4 cols) */}
@@ -911,6 +1307,94 @@ export const StationMap: React.FC<StationMapProps> = ({
                   </div>
                 );
               })()}
+
+              {/* Offline Station Navigation Card */}
+              <div className="mb-3.5 p-3 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-2.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                    <Compass className="w-4 h-4 text-amber-400" />
+                    <span>{lang === 'en' ? 'Offline Station Navigation' : 'ከመስመር ውጭ አሰሳ እና ጂፒኤስ'}</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {isOfflineDownloaded
+                      ? lang === 'en' ? 'Data Cached' : 'ካርታ ተቀምጧል'
+                      : lang === 'en' ? 'GPS Ready' : 'ጂፒኤስ ዝግጁ'}
+                  </span>
+                </div>
+
+                {/* Distance & Bearing from passenger */}
+                <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700 text-xs">
+                  {userLocation ? (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">
+                          {lang === 'en' ? 'Distance from Your Location' : 'ከእርስዎ ያለ ርቀት'}
+                        </span>
+                        <span className="font-bold text-emerald-400 text-sm">
+                          {calculateDistanceKm(userLocation.lat, userLocation.lng, activeStation.lat, activeStation.lng)} km
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">
+                          {lang === 'en' ? 'Compass Bearing' : 'አቅጣጫ'}
+                        </span>
+                        <span className="font-bold text-amber-300 text-xs font-mono">
+                          {calculateBearing(userLocation.lat, userLocation.lng, activeStation.lat, activeStation.lng)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestUserLocation}
+                      disabled={isLocatingUser}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-700 hover:bg-slate-650 text-slate-200 rounded text-xs font-medium transition cursor-pointer"
+                    >
+                      <Navigation className={`w-3.5 h-3.5 text-amber-300 ${isLocatingUser ? 'animate-spin' : ''}`} />
+                      <span>
+                        {isLocatingUser
+                          ? (lang === 'en' ? 'Acquiring GPS...' : 'GPS በመፈለግ ላይ...')
+                          : (lang === 'en' ? 'Calculate Distance from My Location' : 'ከእኔ ቦታ ያለውን ርቀት አስላ')}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Exact GPS Coordinates with 1-click copy */}
+                <div className="flex items-center justify-between text-xs bg-slate-800/60 p-2 rounded-lg border border-slate-700/60">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">
+                      {lang === 'en' ? 'Terminal GPS Coordinates' : 'የመናኸሪያው ጂፒኤስ መጋጠሚያ'}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-200">
+                      {activeStation.lat.toFixed(4)}°N, {activeStation.lng.toFixed(4)}°E
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyGps(activeStation.lat, activeStation.lng)}
+                    className="flex items-center gap-1 px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded text-xs font-semibold transition cursor-pointer"
+                    title={lang === 'en' ? 'Copy GPS coordinates for offline navigation' : 'የጂፒኤስ መጋጠሚያ ቅዳ'}
+                  >
+                    {copiedGps ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedGps ? (lang === 'en' ? 'Copied' : 'ተቀድቷል') : (lang === 'en' ? 'Copy' : 'ቅዳ')}</span>
+                  </button>
+                </div>
+
+                {/* Emergency Station Master Helpline (offline direct dial) */}
+                <div className="flex items-center justify-between text-xs pt-0.5">
+                  <span className="text-[11px] text-slate-300 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-rose-400" />
+                    <span>{lang === 'en' ? 'Offline Emergency Line:' : 'የአደጋ ጊዜ ስልክ፡'}</span>
+                  </span>
+                  <a
+                    href={`tel:${activeStation.emergencyPhone || activeStation.phone}`}
+                    className="font-mono font-bold text-amber-300 hover:underline text-[11px]"
+                  >
+                    {activeStation.emergencyPhone || activeStation.phone}
+                  </a>
+                </div>
+              </div>
 
               {/* Quick Info Grid */}
               <div className="grid grid-cols-2 gap-2 text-xs mb-3 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">

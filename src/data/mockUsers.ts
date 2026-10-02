@@ -63,7 +63,47 @@ export const MOCK_USERS: UserProfile[] = [
     safetyScorePercent: 98.6,
   },
 
-  // 3. Administration & Station Masters
+  // 3. Bus Owners & Fleet Operators
+  {
+    id: 'owner-belay',
+    role: 'bus_owner',
+    fullName: 'Ato Belayneh Kassa',
+    fullNameAm: 'አቶ በላይነህ ካሳ',
+    phoneNumber: '+251 91 822 5566',
+    email: 'belayneh.kassa@tana-coach.et',
+    avatarBadge: 'BK',
+    busOwnerCompanyName: 'Tana Express Coach Services SC',
+    busOwnerCompanyNameAm: 'ጣና ኤክስፕረስ የረጅም ርቀት አውቶቡስ አ.ማ',
+    fleetSize: 8,
+    operatorLicenseNumber: 'AMH-FLEET-2024-884',
+    registeredVehicles: ['ET 03-A88219', 'ET 03-B55420', 'ET 03-C33910', 'ET 03-D11408', 'ET 03-E99012'],
+    businessRegistrationNo: 'MT-AMH-99214',
+    totalRevenueETB: 1485600,
+    bankAccountPayoutRef: 'CBE 1000192837465',
+    terminalBase: 'Bahir Dar Grand Station',
+    terminalBaseAm: 'ባሕር ዳር ጣና መናኸሪያ',
+  },
+  {
+    id: 'owner-tigist',
+    role: 'bus_owner',
+    fullName: 'W/ro Tigist Hailu',
+    fullNameAm: 'ወ/ሮ ትዕግስት ኃይሉ',
+    phoneNumber: '+251 92 411 9900',
+    email: 'tigist.hailu@abay-transport.et',
+    avatarBadge: 'TH',
+    busOwnerCompanyName: 'Abay Minibus & Coaster Association',
+    busOwnerCompanyNameAm: 'ዓባይ ሚኒባስና ኮስተር ማህበር',
+    fleetSize: 14,
+    operatorLicenseNumber: 'AMH-FLEET-2023-319',
+    registeredVehicles: ['ET 03-M44102', 'ET 03-M88320', 'ET 03-K12903', 'ET 03-P77211'],
+    businessRegistrationNo: 'MT-AMH-44910',
+    totalRevenueETB: 942300,
+    bankAccountPayoutRef: 'Telebirr Merchant 0924119900',
+    terminalBase: 'Dessie Boru Terminal',
+    terminalBaseAm: 'ደሴ ቦሩ መናኸሪያ',
+  },
+
+  // 4. Administration & Station Masters
   {
     id: 'adm-yonas',
     role: 'admin',

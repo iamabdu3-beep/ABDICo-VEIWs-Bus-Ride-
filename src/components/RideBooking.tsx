@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { BusStation, RideTrip, VehicleCategory, Language, DriverContactContext } from '../types';
+import React, { useState, useEffect } from 'react';
+import { BusStation, RideTrip, VehicleCategory, Language, DriverContactContext, WeatherAlert } from '../types';
 import { AMHARA_STATIONS } from '../data/amharaStations';
+import { INITIAL_WEATHER_ALERTS, checkCorridorSevereWeather } from '../data/weatherAlerts';
+import { WeatherAlertBanner } from './WeatherAlertBanner';
 import { translations } from '../translations';
 import { triggerHaptic } from '../utils/haptics';
 import {
@@ -22,7 +24,17 @@ import {
   Building2,
   Check,
   MessageSquare,
+  AlertTriangle,
+  Compass,
+  ArrowUpDown,
+  ChevronDown,
+  Zap,
+  Smartphone,
+  Headphones,
 } from 'lucide-react';
+import { parseTimeToMinutes } from '../utils/departureScheduler';
+
+export type TripSortOption = 'earliest_departure' | 'lowest_price' | 'fastest_duration';
 
 interface RideBookingProps {
   lang: Language;
@@ -34,6 +46,9 @@ interface RideBookingProps {
   onSelectTripToBook: (trip: RideTrip) => void;
   onViewOnMap: (originId: string, destId: string) => void;
   onContactDriver?: (context: DriverContactContext) => void;
+  weatherAlerts?: Record<string, WeatherAlert>;
+  onToggleStationWeatherAlert?: (stationId: string) => void;
+  onOpenTripPlanner?: (originId?: string, destId?: string) => void;
 }
 
 export const RideBooking: React.FC<RideBookingProps> = ({
@@ -46,12 +61,87 @@ export const RideBooking: React.FC<RideBookingProps> = ({
   onSelectTripToBook,
   onViewOnMap,
   onContactDriver,
+  weatherAlerts,
+  onToggleStationWeatherAlert,
+  onOpenTripPlanner,
 }) => {
   const t = translations[lang];
   const [selectedVehicleType, setSelectedVehicleType] = useState<string>('all');
   const [travelDate, setTravelDate] = useState<string>('2026-09-15');
   const [filterAvailableOnly, setFilterAvailableOnly] = useState<boolean>(false);
   const [companySearchQuery, setCompanySearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<TripSortOption>('earliest_departure');
+
+  // Weather alerts state (defaults to INITIAL_WEATHER_ALERTS)
+  const [localWeatherAlerts, setLocalWeatherAlerts] = useState<Record<string, WeatherAlert>>(
+    weatherAlerts || INITIAL_WEATHER_ALERTS
+  );
+
+  useEffect(() => {
+    if (weatherAlerts) {
+      setLocalWeatherAlerts(weatherAlerts);
+    }
+  }, [weatherAlerts]);
+
+  const handleToggleStationAlert = (stId: string) => {
+    if (onToggleStationWeatherAlert) {
+      onToggleStationWeatherAlert(stId);
+    } else {
+      setLocalWeatherAlerts((prev) => {
+        const existing = prev[stId];
+        if (existing) {
+          return {
+            ...prev,
+            [stId]: { ...existing, isActive: !existing.isActive },
+          };
+        } else {
+          const st = AMHARA_STATIONS.find((s) => s.id === stId);
+          return {
+            ...prev,
+            [stId]: {
+              id: `alert-${stId}-${Date.now()}`,
+              stationId: stId,
+              stationName: st?.name || stId,
+              stationNameAm: st?.nameAm || stId,
+              regionZone: st?.zone || 'Amhara',
+              regionZoneAm: st?.zoneAm || 'አማራ',
+              severity: 'Severe',
+              eventType: 'SEVERE_THUNDERSTORM',
+              eventTitle: `Severe Mountain Advisory - ${st?.city || stId}`,
+              eventTitleAm: `ከባድ የተራራ ማስጠንቀቂያ - ${st?.cityAm || stId}`,
+              description: `Severe localized weather reported affecting terminal approaches to ${st?.city || stId}. Speed reduced.`,
+              descriptionAm: `ወደ ${st?.cityAm || stId} በሚወስዱ መንገዶች ላይ ከባድ የአየር ሁኔታ ተከስቷል። ፍጥነት ቀንሶ ይጓዙ።`,
+              safetyRecommendations: [
+                'Reduce travel speeds to 30 km/h on switchbacks.',
+                'Check terminal departure boards for delay updates.',
+              ],
+              safetyRecommendationsAm: [
+                'በተራራማ መንገዶች ፍጥነትዎን በሰዓት 30 ኪ.ሜ ይገድቡ።',
+                'የመነሻ ሰዓቶችን ከመናኸሪያው ቦርድ ያረጋግጡ።',
+              ],
+              expectedDelayMin: 40,
+              corridorHighway: `Corridor access to ${st?.city || stId}`,
+              dataSource: {
+                name: 'Ethiopian Meteorological Institute (EMI)',
+                authorityUri: 'https://www.ethiomet.gov.et',
+              },
+              startTime: new Date().toISOString(),
+              expirationTime: new Date(Date.now() + 12 * 3600 * 1000).toISOString(),
+              isActive: true,
+              affectedRole: 'origin',
+            },
+          };
+        }
+      });
+    }
+  };
+
+  // Evaluate if origin or destination has severe weather reported
+  const corridorWeather = checkCorridorSevereWeather(
+    originStationId,
+    destStationId,
+    localWeatherAlerts
+  );
 
   const vehicleCategories: { id: string; labelEn: string; labelAm: string }[] = [
     { id: 'all', labelEn: 'All Vehicles', labelAm: 'ሁሉም ተሽከርካሪዎች' },
@@ -98,6 +188,60 @@ export const RideBooking: React.FC<RideBookingProps> = ({
     return matchesOrigin && matchesDest && matchesVehicle && matchesAvailability && matchesCompany;
   });
 
+  // Helper to parse duration string (e.g. "3h 15m", "2h", "45m") into total minutes for fast accurate ordering
+  const parseDurationToMinutes = (durationStr?: string, depTime?: string, arrTime?: string): number => {
+    if (durationStr) {
+      let total = 0;
+      const hMatch = durationStr.match(/(\d+)\s*h/i);
+      const mMatch = durationStr.match(/(\d+)\s*m/i);
+      if (hMatch) total += parseInt(hMatch[1], 10) * 60;
+      if (mMatch) total += parseInt(mMatch[1], 10);
+      if (total > 0) return total;
+    }
+    if (depTime && arrTime) {
+      const dep = parseTimeToMinutes(depTime);
+      const arr = parseTimeToMinutes(arrTime);
+      if (dep !== null && arr !== null) {
+        let diff = arr - dep;
+        if (diff < 0) diff += 1440; // crosses midnight
+        return diff;
+      }
+    }
+    return 9999;
+  };
+
+  // Sort trips by 'earliest_departure', 'lowest_price', or 'fastest_duration'
+  const sortedTrips = [...filteredTrips].sort((a, b) => {
+    if (sortBy === 'earliest_departure') {
+      const timeA = parseTimeToMinutes(a.departureTime) ?? 9999;
+      const timeB = parseTimeToMinutes(b.departureTime) ?? 9999;
+      if (timeA !== timeB) return timeA - timeB;
+      return a.priceETB - b.priceETB;
+    }
+    if (sortBy === 'lowest_price') {
+      if (a.priceETB !== b.priceETB) return a.priceETB - b.priceETB;
+      const timeA = parseTimeToMinutes(a.departureTime) ?? 9999;
+      const timeB = parseTimeToMinutes(b.departureTime) ?? 9999;
+      return timeA - timeB;
+    }
+    if (sortBy === 'fastest_duration') {
+      const durA = parseDurationToMinutes(a.durationFormatted, a.departureTime, a.arrivalTime);
+      const durB = parseDurationToMinutes(b.durationFormatted, b.departureTime, b.arrivalTime);
+      if (durA !== durB) return durA - durB;
+      return a.priceETB - b.priceETB;
+    }
+    return 0;
+  });
+
+  // Calculate top highlight metrics in current results
+  const lowestPriceInResults = sortedTrips.length > 0 ? Math.min(...sortedTrips.map((t) => t.priceETB)) : null;
+  const fastestDurationInResults = sortedTrips.length > 0
+    ? Math.min(...sortedTrips.map((t) => parseDurationToMinutes(t.durationFormatted, t.departureTime, t.arrivalTime)))
+    : null;
+  const earliestDepartureInResults = sortedTrips.length > 0
+    ? Math.min(...sortedTrips.map((t) => parseTimeToMinutes(t.departureTime) ?? 9999))
+    : null;
+
   // Calculate route availability stats for indicator badges
   const currentRouteTrips = trips.filter((trip) => {
     const matchesOrigin = !originStationId || trip.fromStationId === originStationId;
@@ -125,7 +269,7 @@ export const RideBooking: React.FC<RideBookingProps> = ({
             <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md shadow-emerald-900/15 border border-emerald-600/30 shrink-0 bg-emerald-800 flex items-center justify-center">
               <img
                 src="/app-logo.png"
-                alt="Bus Ride App Logo"
+                alt={lang === 'am' ? 'ባስ ራይድ' : 'Bus Ride'}
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
@@ -133,7 +277,11 @@ export const RideBooking: React.FC<RideBookingProps> = ({
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-emerald-700" />
-                <span>{lang === 'en' ? 'Bus Ride App • Ethiopian Regional Transit' : 'የአውቶቡስ ጉዞ መተግበሪያ • የክልል ትራንስፖርት'}</span>
+                <span>
+                  {lang === 'am'
+                    ? 'ባስ ራይድ • የክልል አውቶቡስ ትራንስፖርት'
+                    : 'Bus Ride • Regional Bus Transit'}
+                </span>
               </span>
               <h1 className="text-xl sm:text-2xl font-extrabold text-neutral-900 mt-0.5">
                 {t.searchRides}
@@ -150,21 +298,56 @@ export const RideBooking: React.FC<RideBookingProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
           {/* Origin Station */}
           <div className="md:col-span-4">
-            <label className="text-xs font-bold text-neutral-700 block mb-1.5">
-              {t.fromStation}
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-neutral-700 block">
+                {t.fromStation}
+              </label>
+              {corridorWeather.originAlert && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded-md flex items-center gap-0.5 animate-pulse">
+                  <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                  <span>{lang === 'en' ? 'Alert Active' : 'ማስጠንቀቂያ አለ'}</span>
+                </span>
+              )}
+            </div>
             <div className="relative">
               <select
                 value={originStationId}
                 onChange={(e) => setOriginStationId(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-neutral-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-neutral-50/50 appearance-none pr-8 cursor-pointer"
+                className={`w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border focus:outline-hidden focus:ring-2 appearance-none pr-8 cursor-pointer ${
+                  corridorWeather.originAlert
+                    ? 'border-amber-400 bg-amber-50/40 text-amber-950 focus:ring-amber-500'
+                    : 'border-neutral-300 bg-neutral-50/50 text-neutral-900 focus:ring-emerald-500'
+                }`}
               >
                 <option value="">{t.selectStation} (All Origin)</option>
-                {AMHARA_STATIONS.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {lang === 'en' ? station.name : station.nameAm} ({station.city})
-                  </option>
-                ))}
+                <optgroup label="⭐ Federal Terminals (ብሔራዊ / ፌደራል)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'federal').map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.city})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏛️ Regional Capitals (የክልል ማዕከላት)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'regional').map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.regionName || station.city})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏢 Zonal Hubs (የዞን መናኸሪያዎች)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'zonal').map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.zone})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏘️ Woreda Stations (የወረዳ ጣቢያዎች)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'woreda' || !s.hierarchyTier).map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.city})
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <div className="absolute right-3 top-3 pointer-events-none text-neutral-400 text-xs">
                 ▼
@@ -186,21 +369,56 @@ export const RideBooking: React.FC<RideBookingProps> = ({
 
           {/* Destination Station */}
           <div className="md:col-span-4">
-            <label className="text-xs font-bold text-neutral-700 block mb-1.5">
-              {t.toStation}
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-neutral-700 block">
+                {t.toStation}
+              </label>
+              {corridorWeather.destAlert && (
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-md flex items-center gap-0.5 animate-pulse">
+                  <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
+                  <span>{lang === 'en' ? 'Alert Active' : 'ማስጠንቀቂያ አለ'}</span>
+                </span>
+              )}
+            </div>
             <div className="relative">
               <select
                 value={destStationId}
                 onChange={(e) => setDestStationId(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-neutral-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-neutral-50/50 appearance-none pr-8 cursor-pointer"
+                className={`w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border focus:outline-hidden focus:ring-2 appearance-none pr-8 cursor-pointer ${
+                  corridorWeather.destAlert
+                    ? 'border-rose-400 bg-rose-50/40 text-rose-950 focus:ring-rose-500'
+                    : 'border-neutral-300 bg-neutral-50/50 text-neutral-900 focus:ring-emerald-500'
+                }`}
               >
                 <option value="">{t.selectStation} (All Destination)</option>
-                {AMHARA_STATIONS.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {lang === 'en' ? station.name : station.nameAm} ({station.city})
-                  </option>
-                ))}
+                <optgroup label="⭐ Federal Terminals (ብሔራዊ / ፌደራል)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'federal').map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.city})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏛️ Regional Capitals (የክልል ማዕከላት)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'regional').map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.regionName || station.city})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏢 Zonal Hubs (የዞን መናኸሪያዎች)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'zonal').map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.zone})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏘️ Woreda Stations (የወረዳ ጣቢያዎች)">
+                  {AMHARA_STATIONS.filter((s) => s.hierarchyTier === 'woreda' || !s.hierarchyTier).map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {lang === 'en' ? station.name : station.nameAm} ({station.city})
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <div className="absolute right-3 top-3 pointer-events-none text-neutral-400 text-xs">
                 ▼
@@ -229,20 +447,44 @@ export const RideBooking: React.FC<RideBookingProps> = ({
           <span className="text-neutral-500 font-medium">
             {t.popularRoutes}:
           </span>
-          {popularCorridors.map((corridor, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setOriginStationId(corridor.from);
-                setDestStationId(corridor.to);
-              }}
-              className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-emerald-50 hover:text-emerald-800 text-neutral-700 border border-neutral-200 transition cursor-pointer font-medium text-[11px]"
-            >
-              {lang === 'en' ? corridor.labelEn : corridor.labelAm}
-            </button>
-          ))}
+          {popularCorridors.map((corridor, idx) => {
+            const hasAlert =
+              localWeatherAlerts[corridor.from]?.isActive ||
+              localWeatherAlerts[corridor.to]?.isActive;
+            return (
+              <button
+                key={idx}
+                onClick={() => {
+                  setOriginStationId(corridor.from);
+                  setDestStationId(corridor.to);
+                }}
+                className={`px-2.5 py-1 rounded-lg border transition cursor-pointer font-medium text-[11px] flex items-center gap-1 ${
+                  hasAlert
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                    : 'bg-neutral-100 hover:bg-emerald-50 hover:text-emerald-800 text-neutral-700 border-neutral-200'
+                }`}
+              >
+                {hasAlert && <span className="text-[10px]">⚠️</span>}
+                <span>{lang === 'en' ? corridor.labelEn : corridor.labelAm}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Conditionally Rendered Weather-Alert Banner if severe weather reported in origin or destination */}
+      {corridorWeather.hasSevereWeather && (
+        <WeatherAlertBanner
+          lang={lang}
+          originStationId={originStationId}
+          destStationId={destStationId}
+          originAlert={corridorWeather.originAlert}
+          destAlert={corridorWeather.destAlert}
+          affectedRole={corridorWeather.affectedRole}
+          onToggleStationAlert={handleToggleStationAlert}
+          allAlertsState={localWeatherAlerts}
+        />
+      )}
 
       {/* Vehicle Category Tabs */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -378,14 +620,126 @@ export const RideBooking: React.FC<RideBookingProps> = ({
         </div>
       </div>
 
+      {/* Trip Planner Shortcut Banner */}
+      {onOpenTripPlanner && (
+        <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 text-white rounded-3xl p-4 sm:p-5 shadow-sm border border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="p-2.5 bg-emerald-800/80 rounded-2xl text-amber-300 shrink-0 border border-emerald-700/60 shadow-xs">
+              <Compass className="w-5 h-5 animate-spin-slow" />
+            </span>
+            <div>
+              <span className="text-xs sm:text-sm font-extrabold text-white block">
+                {lang === 'en'
+                  ? 'Planning a multi-city journey or looking for connecting transfers?'
+                  : 'የባለብዙ ከተማ ወይም በዝውውር የሚገናኝ ጉዞ እያቀዱ ነው?'}
+              </span>
+              <span className="text-xs text-emerald-200/90 block">
+                {lang === 'en'
+                  ? 'Use the Amhara Regional Trip Planner to compare routes, transfers, elevation profiles, and scenic mountain corridors.'
+                  : 'የአማራ የጉዞ እቅድ ማውጫን በመጠቀም የዝውውር ሰዓቶችን፣ የተራራ ከፍታዎችንና አማራጮችን ያወዳድሩ።'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenTripPlanner(originStationId, destStationId)}
+            className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shrink-0 transition cursor-pointer shadow-md active:scale-95 text-center"
+          >
+            {lang === 'en' ? 'Open Trip Planner ➔' : 'የጉዞ እቅድ ክፈት ➔'}
+          </button>
+        </div>
+      )}
+
+      {/* Offline USSD & 24/7 Call Center Assurance Banner */}
+      <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-neutral-900 text-white rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs border border-emerald-800 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1.5 bg-emerald-800/80 rounded-xl text-amber-300 shrink-0">
+            <Smartphone className="w-4 h-4" />
+          </span>
+          <span className="font-semibold text-neutral-100 text-xs sm:text-sm">
+            {lang === 'am'
+              ? 'ሁሉም ትኬቶች ከመስመር ውጭ የUSSD አገልግሎት (*805#) እና የ24/7 የጥሪ ማዕከል ድጋፍ (994) ያካትታሉ'
+              : 'All ride tickets include offline Ethio Telecom USSD access (*805#) & 24/7 Call Center support (994)'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-mono text-emerald-200">
+          <span className="bg-emerald-900/90 px-2.5 py-1 rounded-lg border border-emerald-700/80 text-amber-300 font-bold">
+            USSD: *805#
+          </span>
+          <a
+            href="tel:994"
+            className="bg-amber-400 hover:bg-amber-300 text-neutral-950 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer"
+          >
+            <Phone className="w-3 h-3" />
+            <span>994 Toll-Free</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Results Header with Trip Count and Sort By Control */}
+      {filteredTrips.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:px-4 rounded-2xl border border-neutral-200 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+              {filteredTrips.length}
+            </span>
+            <span className="text-xs font-bold text-neutral-800">
+              {lang === 'en'
+                ? `${filteredTrips.length} ${filteredTrips.length === 1 ? 'Trip Available' : 'Trips Available'}`
+                : `${filteredTrips.length} ጉዞዎች ተገኝተዋል`}
+            </span>
+            {(companySearchQuery || filterAvailableOnly || originStationId || destStationId || selectedVehicleType !== 'all') && (
+              <span className="text-[11px] text-neutral-400 hidden md:inline">
+                • {lang === 'en' ? 'Filtered results' : 'የተጣሩ ውጤቶች'}
+              </span>
+            )}
+          </div>
+
+          {/* Sort By Dropdown */}
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <label htmlFor="ride-sort-dropdown" className="text-xs font-semibold text-neutral-600 flex items-center gap-1.5 select-none">
+              <ArrowUpDown className="w-3.5 h-3.5 text-emerald-700" />
+              <span>{t.sortBy || (lang === 'en' ? 'Sort by:' : 'ደርድር በ፡')}</span>
+            </label>
+            <div className="relative">
+              <select
+                id="ride-sort-dropdown"
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value as TripSortOption);
+                  triggerHaptic(15);
+                }}
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs font-semibold rounded-xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-neutral-800 transition cursor-pointer"
+              >
+                <option value="earliest_departure">
+                  {lang === 'en' ? '⏱️ Earliest Departure' : '⏱️ ቀደምት መነሻ'}
+                </option>
+                <option value="lowest_price">
+                  {lang === 'en' ? '💰 Lowest Price' : '💰 ዝቅተኛ ዋጋ'}
+                </option>
+                <option value="fastest_duration">
+                  {lang === 'en' ? '⚡ Fastest Travel Duration' : '⚡ ፈጣን የጉዞ ርዝመት'}
+                </option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-neutral-500">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Trips Cards List */}
-      {filteredTrips.length > 0 ? (
+      {sortedTrips.length > 0 ? (
         <div className="space-y-3.5">
-          {filteredTrips.map((trip) => {
+          {sortedTrips.map((trip) => {
             const originStation = getStationById(trip.fromStationId);
             const destStation = getStationById(trip.toStationId);
             const availableSeatsCount = trip.totalSeats - trip.bookedSeats.length;
             const isSoldOut = availableSeatsCount <= 0;
+            const tripHasAlert =
+              localWeatherAlerts[trip.fromStationId]?.isActive ||
+              localWeatherAlerts[trip.toStationId]?.isActive;
 
             return (
               <div
@@ -491,9 +845,16 @@ export const RideBooking: React.FC<RideBookingProps> = ({
                           <div className="h-0.5 w-full bg-neutral-300" />
                           <Bus className="w-4 h-4 text-emerald-700 absolute bg-neutral-50 px-0.5" />
                         </div>
-                        <span className="text-[9px] text-emerald-700 uppercase font-bold tracking-wider">
-                          Direct Express
-                        </span>
+                        {tripHasAlert ? (
+                          <span className="text-[9px] text-amber-700 bg-amber-100/90 px-1.5 py-0.5 rounded font-bold tracking-tight inline-flex items-center gap-0.5">
+                            <span>⚠️</span>
+                            <span>{lang === 'en' ? 'Weather Delay' : 'የአየር መዘግየት'}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-emerald-700 uppercase font-bold tracking-wider">
+                            Direct Express
+                          </span>
+                        )}
                       </div>
 
                       {/* Arrival */}
@@ -597,18 +958,31 @@ export const RideBooking: React.FC<RideBookingProps> = ({
               t.noRidesFound
             )}
           </p>
-          <button
-            onClick={() => {
-              setOriginStationId('');
-              setDestStationId('');
-              setSelectedVehicleType('all');
-              setCompanySearchQuery('');
-              setFilterAvailableOnly(false);
-            }}
-            className="px-4 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition cursor-pointer"
-          >
-            {lang === 'en' ? 'Clear All Filters & Reset Search' : 'ሁሉንም ማጣሪያዎች አጽዳ'}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              onClick={() => {
+                setOriginStationId('');
+                setDestStationId('');
+                setSelectedVehicleType('all');
+                setCompanySearchQuery('');
+                setFilterAvailableOnly(false);
+              }}
+              className="px-4 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition cursor-pointer"
+            >
+              {lang === 'en' ? 'Clear All Filters & Reset Search' : 'ሁሉንም ማጣሪያዎች አጽዳ'}
+            </button>
+
+            {onOpenTripPlanner && (
+              <button
+                type="button"
+                onClick={() => onOpenTripPlanner(originStationId, destStationId)}
+                className="px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-600 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+              >
+                <Compass className="w-3.5 h-3.5 text-amber-300" />
+                <span>{lang === 'en' ? 'Plan Connecting Route with Trip Planner' : 'በጉዞ እቅድ ማውጫ አማራጭ መስመሮችን ፈልግ'}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

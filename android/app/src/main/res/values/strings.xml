@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">ባስ ራይድ - Bus Ride</string>
+    <string name="app_short_name">ባስ ራይድ</string>
+    <string name="package_name">et.busride.amhara</string>
+    <string name="default_web_url">https://ais-dev-iaqi6iwmhmuh7dkl53phji-360328436489.europe-west2.run.app</string>
+    <string name="offline_title">ከመስመር ውጭ ነዎት (Offline)</string>
+    <string name="offline_message">እባክዎ የኢንተርኔት ግንኙነትዎን ያረጋግጡ። የተቀመጡ ትኬቶች አሁንም ይሰራሉ።</string>
+    <string name="retry_button">እንደገና ሞክር (Retry)</string>
+    <string name="open_tickets_offline">የተቀመጡ ትኬቶችን ክፈት (Open Cached Passes)</string>
+</resources>

@@ -1,0 +1,44 @@
+{
+  "packageId": "et.busride.amhara",
+  "host": "ais-dev-iaqi6iwmhmuh7dkl53phji-360328436489.europe-west2.run.app",
+  "name": "ባስ ራይድ - Bus Ride App",
+  "launcherName": "ባስ ራይድ",
+  "themeColor": "#047857",
+  "themeColorDark": "#064e3b",
+  "navigationColor": "#022c22",
+  "navigationColorDark": "#022c22",
+  "navigationDividerColor": "#047857",
+  "navigationDividerColorDark": "#047857",
+  "backgroundColor": "#064e3b",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ais-dev-iaqi6iwmhmuh7dkl53phji-360328436489.europe-west2.run.app/pwa-512x512.png",
+  "maskableIconUrl": "https://ais-dev-iaqi6iwmhmuh7dkl53phji-360328436489.europe-west2.run.app/pwa-maskable-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android/app/keystore/release.jks",
+    "alias": "busride"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "minSdkVersion": 24,
+  "targetSdkVersion": 34,
+  "orientation": "portrait",
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ais-dev-iaqi6iwmhmuh7dkl53phji-360328436489.europe-west2.run.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false
+}

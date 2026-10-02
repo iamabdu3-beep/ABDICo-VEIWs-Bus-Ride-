@@ -16,9 +16,17 @@ import {
   Star,
   CheckCircle2,
   Filter,
+  Navigation,
+  MapPin,
+  ChevronDown,
+  ChevronUp,
+  Phone,
+  Headphones,
+  Smartphone,
 } from 'lucide-react';
 import { LuggageTrackingView } from './LuggageTrackingView';
 import { TripFeedbackView } from './TripFeedbackView';
+import { TicketRouteMiniMap } from './TicketRouteMiniMap';
 import { getOrGenerateLuggageItems, getStatusBadgeConfig } from '../utils/luggageGenerator';
 import { triggerHaptic } from '../utils/haptics';
 
@@ -32,6 +40,8 @@ interface MyTicketsModalProps {
   initialTrackingTicket?: BookingTicket | null;
   onContactDriver?: (ticket: BookingTicket) => void;
   onUpdateFeedback?: (ticketId: string, feedback: TripFeedback) => void;
+  onExploreFullMap?: (fromStationId: string, toStationId: string) => void;
+  onTrackLiveBus?: (ticket: BookingTicket) => void;
 }
 
 export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
@@ -44,12 +54,27 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
   initialTrackingTicket = null,
   onContactDriver,
   onUpdateFeedback,
+  onExploreFullMap,
+  onTrackLiveBus,
 }) => {
   const t = translations[lang];
   const isAm = lang === 'am';
   const [trackingTicket, setTrackingTicket] = useState<BookingTicket | null>(initialTrackingTicket);
   const [feedbackTicket, setFeedbackTicket] = useState<BookingTicket | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'completed'>('all');
+
+  // Selected active ticket for Route Mini-Map
+  const [selectedTicketForMapId, setSelectedTicketForMapId] = useState<string | null>(() => {
+    const activeT = tickets.find((t) => t.status !== 'completed');
+    return activeT ? activeT.ticketId : (tickets[0]?.ticketId || null);
+  });
+  const [isRouteMapOpen, setIsRouteMapOpen] = useState<boolean>(true);
+  const [isRouteMapExpanded, setIsRouteMapExpanded] = useState<boolean>(false);
+
+  const selectedMapTicket = React.useMemo(() => {
+    if (!selectedTicketForMapId) return tickets[0] || null;
+    return tickets.find((t) => t.ticketId === selectedTicketForMapId) || tickets[0] || null;
+  }, [tickets, selectedTicketForMapId]);
 
   const filteredTickets = tickets.filter((tk) => {
     if (activeFilter === 'active') return tk.status !== 'completed';
@@ -61,7 +86,11 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
       <div
         className={`bg-white rounded-3xl w-full p-5 sm:p-6 shadow-2xl border border-neutral-200 relative animate-in fade-in zoom-in-95 duration-150 transition-all ${
-          trackingTicket || feedbackTicket ? 'max-w-2xl' : 'max-w-xl'
+          trackingTicket || feedbackTicket
+            ? 'max-w-2xl'
+            : isRouteMapOpen && selectedMapTicket
+            ? 'max-w-2xl sm:max-w-3xl'
+            : 'max-w-xl'
         }`}
       >
         <button
@@ -110,7 +139,7 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
                 <div className="flex items-center gap-2">
                   <Ticket className="w-5 h-5 text-emerald-700" />
                   <h3 className="text-xl font-bold text-neutral-900">
-                    {t.myTickets}
+                    {t.modalMyTicketsTitle || t.myTickets}
                   </h3>
                   <span className="text-xs font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
                     {tickets.length}
@@ -118,9 +147,9 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
                 </div>
               </div>
               <p className="text-xs text-neutral-500 mt-0.5">
-                {lang === 'en'
-                  ? 'Your Amhara regional bus ride passes, luggage tracking & journey feedback'
-                  : 'የተያዙ የአውቶቡስ ትኬቶች፣ የቦርዲንግ ፓሶች፣ የሻንጣ ክትትል እና የጉዞ ግምገማዎች'}
+                {t.modalMyTicketsSub || (isAm
+                  ? 'የተያዙ የአውቶቡስ ትኬቶች፣ የቦርዲንግ ፓሶች፣ የሻንጣ ክትትል እና የጉዞ ግምገማዎች'
+                  : 'Your Amhara regional bus ride passes, luggage tracking & journey feedback')}
               </p>
 
               {/* Filter Tabs */}
@@ -179,10 +208,102 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
               )}
             </div>
 
+            {/* Selected Active Ticket Route Mini-Map Integration */}
+            {selectedMapTicket && (
+              <div className="mb-4 bg-neutral-900/95 text-white rounded-2xl border border-neutral-700/80 p-3 shadow-md">
+                <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-neutral-800 text-xs flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 font-bold text-neutral-100">
+                      <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{isAm ? 'የጉዞ መስመር ካርታ' : 'Route Path Mini-Map'}</span>
+                    </div>
+
+                    {/* Active Ticket selector tags if user has multiple tickets */}
+                    {tickets.length > 1 && (
+                      <div className="flex items-center gap-1 overflow-x-auto max-w-xs sm:max-w-md scrollbar-none">
+                        {tickets.map((t) => {
+                          const isSel = selectedMapTicket.ticketId === t.ticketId;
+                          return (
+                            <button
+                              key={t.ticketId}
+                              type="button"
+                              onClick={() => {
+                                triggerHaptic(8);
+                                setSelectedTicketForMapId(t.ticketId);
+                                setIsRouteMapOpen(true);
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition whitespace-nowrap cursor-pointer ${
+                                isSel
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                              }`}
+                            >
+                              {t.fromStation.city} ➔ {t.toStation.city}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold hidden sm:inline">
+                      {selectedMapTicket.ticketId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(8);
+                        setIsRouteMapOpen((prev) => !prev);
+                      }}
+                      className="text-[11px] text-neutral-300 hover:text-white flex items-center gap-1 font-semibold cursor-pointer bg-neutral-800 hover:bg-neutral-700 px-2 py-0.5 rounded-lg border border-neutral-700 transition"
+                    >
+                      <span>
+                        {isRouteMapOpen
+                          ? isAm
+                            ? 'ሰብስብ'
+                            : 'Hide Map'
+                          : isAm
+                          ? 'ካርታ አሳይ'
+                          : 'Show Map'}
+                      </span>
+                      {isRouteMapOpen ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {isRouteMapOpen && (
+                  <TicketRouteMiniMap
+                    ticket={selectedMapTicket}
+                    lang={lang}
+                    isExpanded={isRouteMapExpanded}
+                    onToggleExpand={() => setIsRouteMapExpanded((prev) => !prev)}
+                    onExploreFullMap={(fromId, toId) => {
+                      onClose();
+                      if (onExploreFullMap) {
+                        onExploreFullMap(fromId, toId);
+                      }
+                    }}
+                    onTrackLiveBus={(t) => {
+                      onClose();
+                      if (onTrackLiveBus) {
+                        onTrackLiveBus(t);
+                      }
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
             {/* Tickets List */}
             {filteredTickets.length > 0 ? (
-              <div className="space-y-3 max-h-[470px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
                 {filteredTickets.map((ticket) => {
+                  const isSelectedOnMap = selectedMapTicket?.ticketId === ticket.ticketId && isRouteMapOpen;
                   const luggageItems = getOrGenerateLuggageItems(ticket);
                   const primaryLuggage = luggageItems[0];
                   const luggageBadge = primaryLuggage
@@ -193,7 +314,11 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
                     <div
                       key={ticket.ticketId}
                       onClick={() => onSelectTicket(ticket)}
-                      className="bg-neutral-50 hover:bg-emerald-50/40 p-4 rounded-2xl border border-neutral-200 hover:border-emerald-400 transition cursor-pointer shadow-xs flex flex-col gap-3"
+                      className={`p-4 rounded-2xl border transition cursor-pointer shadow-xs flex flex-col gap-3 ${
+                        isSelectedOnMap
+                          ? 'bg-emerald-50/60 border-emerald-400 ring-2 ring-emerald-300/40'
+                          : 'bg-neutral-50 hover:bg-emerald-50/40 border-neutral-200 hover:border-emerald-300'
+                      }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -210,6 +335,17 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
                           ) : (
                             <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
                               {isAm ? 'የተረጋገጠ' : 'Confirmed'}
+                            </span>
+                          )}
+                          {ticket.multiLegGroupId && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-900 rounded-full border border-amber-300">
+                              {isAm ? `ባለ2-ደረጃ (ክፍል ${ticket.legIndex || 1}/2)` : `Leg ${ticket.legIndex || 1} of 2`}
+                            </span>
+                          )}
+                          {isSelectedOnMap && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-700 text-white rounded-full flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                              <span>{isAm ? 'በካርታው ላይ' : 'Active on Map'}</span>
                             </span>
                           )}
                         </div>
@@ -307,10 +443,73 @@ export const MyTicketsModal: React.FC<MyTicketsModalProps> = ({
                         </div>
                       )}
 
+                      {/* Offline USSD & Call Center Ribbon */}
+                      <div className="flex items-center justify-between gap-2 p-2 bg-neutral-900 text-white rounded-xl text-xs flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-amber-300 font-bold text-[11px] bg-neutral-950 px-2 py-0.5 rounded border border-neutral-700">
+                            {ticket.ussdCode || `*805*1*${ticket.ticketId.replace(/\D/g, '') || '784102'}#`}
+                          </span>
+                          <span className="text-[10px] text-neutral-400 hidden sm:inline">
+                            {isAm ? 'ከመስመር ውጭ USSD' : 'Offline USSD'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={`tel:${encodeURIComponent(ticket.ussdCode || '*805*1*784102#')}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerHaptic(10);
+                            }}
+                            className="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] rounded-lg transition flex items-center gap-1 cursor-pointer active:scale-95"
+                            title="Dial USSD code on phone"
+                          >
+                            <Phone className="w-3 h-3" />
+                            <span>{isAm ? 'USSD ደውል' : 'Dial USSD'}</span>
+                          </a>
+
+                          <a
+                            href="tel:994"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerHaptic(10);
+                            }}
+                            className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-[10px] rounded-lg transition flex items-center gap-1 cursor-pointer active:scale-95"
+                            title="Call 994 Toll-Free Support"
+                          >
+                            <Headphones className="w-3 h-3" />
+                            <span>{isAm ? '994 ድጋፍ' : '994 Support'}</span>
+                          </a>
+                        </div>
+                      </div>
+
                       {/* Action buttons row */}
                       <div className="flex items-center justify-between gap-2 pt-2 border-t border-neutral-200/70 flex-wrap">
-                        {/* Luggage tracking & Driver chat buttons */}
+                        {/* Luggage tracking, Route Map & Driver chat buttons */}
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerHaptic(12);
+                              setSelectedTicketForMapId(ticket.ticketId);
+                              setIsRouteMapOpen(true);
+                            }}
+                            className={`px-2.5 py-1.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 ${
+                              isSelectedOnMap
+                                ? 'text-white bg-emerald-700 hover:bg-emerald-800 border border-emerald-800 shadow-xs'
+                                : 'text-sky-950 bg-sky-100 hover:bg-sky-200 border border-sky-300'
+                            }`}
+                            title={
+                              lang === 'en'
+                                ? 'View specific route path and highway corridor on mini-map'
+                                : 'የአውራ ጎዳናውን መስመር እና መናኸሪያዎችን በካርታ እይ'
+                            }
+                          >
+                            <Navigation className="w-3.5 h-3.5 text-current" />
+                            <span>{isAm ? 'የጉዞ ካርታ' : 'Route Map'}</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={(e) => {

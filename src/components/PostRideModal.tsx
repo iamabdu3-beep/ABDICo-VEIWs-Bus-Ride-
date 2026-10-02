@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { BusStation, RideShareOffer, Language } from '../types';
 import { AMHARA_STATIONS } from '../data/amharaStations';
 import { translations } from '../translations';
-import { X, PlusCircle, CheckCircle2, Car, Phone, User, Calendar, Clock, Luggage } from 'lucide-react';
+import { X, PlusCircle, CheckCircle2, Car, Phone, User, Calendar, Clock, Luggage, AlertCircle } from 'lucide-react';
+import { triggerHaptic } from '../utils/haptics';
 
 interface PostRideModalProps {
   lang: Language;
@@ -16,6 +17,7 @@ export const PostRideModal: React.FC<PostRideModalProps> = ({
   onAddRide,
 }) => {
   const t = translations[lang];
+  const isAm = lang === 'am';
 
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('+251 9');
@@ -30,10 +32,34 @@ export const PostRideModal: React.FC<PostRideModalProps> = ({
   const [luggageSpace, setLuggageSpace] = useState<'Small' | 'Medium' | 'Large'>('Medium');
   const [notes, setNotes] = useState('');
   const [acAvailable, setAcAvailable] = useState(true);
+  const [postRideError, setPostRideError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!driverName.trim() || driverPhone.length < 10) return;
+    if (fromStationId === toStationId) {
+      triggerHaptic(30);
+      setPostRideError(t.errSameOriginDest);
+      return;
+    }
+    if (!driverName.trim()) {
+      triggerHaptic(30);
+      setPostRideError(t.errInvalidName || t.errRequiredField);
+      return;
+    }
+    const cleanPhone = driverPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 9) {
+      triggerHaptic(30);
+      setPostRideError(t.errInvalidPhone);
+      return;
+    }
+    if (pricePerSeatETB <= 0) {
+      triggerHaptic(30);
+      setPostRideError(t.errInvalidPrice);
+      return;
+    }
+
+    setPostRideError(null);
+    triggerHaptic(15);
 
     const newOffer: RideShareOffer = {
       id: `share-${Date.now()}`,
@@ -48,9 +74,9 @@ export const PostRideModal: React.FC<PostRideModalProps> = ({
       availableSeats,
       pricePerSeatETB,
       luggageSpace,
-      notes: notes || 'Direct ride between station terminals. Telebirr accepted.',
+      notes: notes || (isAm ? 'በመናኸሪያዎች መካከል የሚደረግ ቀጥታ ጉዞ። በቴሌብር ይከፈላል።' : 'Direct ride between station terminals. Telebirr accepted.'),
       acAvailable,
-      postedAt: 'Just now',
+      postedAt: isAm ? 'አሁን' : 'Just now',
     };
 
     onAddRide(newOffer);
@@ -72,18 +98,35 @@ export const PostRideModal: React.FC<PostRideModalProps> = ({
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 mb-1">
             <Car className="w-4 h-4 text-emerald-600" />
             <span>
-              {lang === 'en'
-                ? 'Community Transport & Empty Seat Sharing'
-                : 'የማህበረሰብ የጋራ ትራንስፖርት'}
+              {isAm
+                ? 'የማህበረሰብ የጋራ ትራንስፖርት'
+                : 'Community Transport & Empty Seat Sharing'}
             </span>
           </div>
           <h3 className="text-xl font-bold text-neutral-900">
-            {t.postRideModalTitle}
+            {t.modalPostRideTitle || t.postRideModalTitle}
           </h3>
           <p className="text-xs text-neutral-500 mt-0.5">
-            {t.postRideModalSub}
+            {t.modalPostRideSub || t.postRideModalSub}
           </p>
         </div>
+
+        {/* Error Alert Banner */}
+        {postRideError && (
+          <div className="mb-3 px-3 py-2 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in duration-150">
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{postRideError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPostRideError(null)}
+              className="text-rose-500 hover:text-rose-700 cursor-pointer p-0.5"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           {/* Driver Name & Phone */}

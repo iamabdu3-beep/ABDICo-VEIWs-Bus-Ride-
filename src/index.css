@@ -1,1 +1,203 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   Android Accessibility Standards: High Contrast Mode (WCAG AAA 7:1)
+   Designed for low-vision & visually impaired passengers across Ethiopia
+   ========================================================================== */
+
+/* Root and Base Enhancements */
+html.high-contrast,
+body.high-contrast,
+.high-contrast {
+  /* Enforce maximum legibility & contrast */
+  color-scheme: light;
+  background-color: #f8f9fa !important;
+  color: #000000 !important;
+}
+
+/* Text elements: force pure pitch black and elevated weights */
+.high-contrast p,
+.high-contrast span,
+.high-contrast div,
+.high-contrast li,
+.high-contrast dt,
+.high-contrast dd,
+.high-contrast th,
+.high-contrast td {
+  text-shadow: none !important;
+}
+
+/* Ensure low-contrast subtle gray text becomes crisp black */
+.high-contrast .text-neutral-400,
+.high-contrast .text-neutral-500,
+.high-contrast .text-neutral-600,
+.high-contrast .text-neutral-700,
+.high-contrast .text-slate-400,
+.high-contrast .text-slate-500,
+.high-contrast .text-slate-600,
+.high-contrast .text-gray-400,
+.high-contrast .text-gray-500,
+.high-contrast .text-gray-600,
+.high-contrast .text-zinc-400,
+.high-contrast .text-zinc-500,
+.high-contrast .text-zinc-600 {
+  color: #000000 !important;
+  font-weight: 600 !important;
+}
+
+/* White or light text inside dark headers/containers must remain pure stark white */
+.high-contrast .bg-emerald-900 *,
+.high-contrast .bg-neutral-900 *,
+.high-contrast .bg-neutral-950 *,
+.high-contrast .bg-slate-900 *,
+.high-contrast .bg-slate-950 *,
+.high-contrast .bg-black *,
+.high-contrast .dark *,
+.high-contrast [class*="bg-emerald-800"] *,
+.high-contrast [class*="bg-emerald-900"] *,
+.high-contrast [class*="bg-rose-900"] *,
+.high-contrast [class*="bg-amber-900"] * {
+  color-scheme: dark;
+}
+
+.high-contrast .bg-emerald-900 .text-emerald-100,
+.high-contrast .bg-emerald-900 .text-emerald-200,
+.high-contrast .bg-neutral-900 .text-neutral-300,
+.high-contrast .bg-neutral-900 .text-neutral-400,
+.high-contrast .bg-neutral-950 .text-neutral-400 {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* Cards, Modals, Forms & Panels: 2px solid stark black borders */
+.high-contrast .bg-white,
+.high-contrast .bg-neutral-50,
+.high-contrast .bg-slate-50,
+.high-contrast article,
+.high-contrast section {
+  background-color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.high-contrast .border,
+.high-contrast .border-neutral-100,
+.high-contrast .border-neutral-200,
+.high-contrast .border-neutral-300,
+.high-contrast .border-slate-100,
+.high-contrast .border-slate-200,
+.high-contrast .border-slate-300 {
+  border-color: #000000 !important;
+  border-width: 2px !important;
+}
+
+/* Form inputs & dropdowns: stark outline and high-contrast fill */
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+  font-weight: 700 !important;
+}
+
+.high-contrast input::placeholder,
+.high-contrast textarea::placeholder {
+  color: #333333 !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
+}
+
+.high-contrast input:focus,
+.high-contrast select:focus,
+.high-contrast textarea:focus,
+.high-contrast button:focus-visible,
+.high-contrast a:focus-visible {
+  outline: 3px solid #ffd700 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px #000000 !important;
+}
+
+/* Buttons: High-visibility solid fills */
+.high-contrast button.bg-emerald-700,
+.high-contrast button.bg-emerald-800,
+.high-contrast button.bg-emerald-600,
+.high-contrast .bg-emerald-700,
+.high-contrast .bg-emerald-800 {
+  background-color: #004d25 !important;
+  color: #ffffff !important;
+  border: 2px solid #000000 !important;
+  font-weight: 800 !important;
+}
+
+.high-contrast button.bg-amber-400,
+.high-contrast button.bg-amber-500,
+.high-contrast .bg-amber-400,
+.high-contrast .bg-amber-500 {
+  background-color: #ffd700 !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+  font-weight: 800 !important;
+}
+
+.high-contrast button.bg-rose-600,
+.high-contrast button.bg-rose-700,
+.high-contrast .bg-rose-600,
+.high-contrast .bg-rose-700 {
+  background-color: #b71c1c !important;
+  color: #ffffff !important;
+  border: 2px solid #000000 !important;
+  font-weight: 800 !important;
+}
+
+/* Secondary & Ghost buttons */
+.high-contrast button.bg-neutral-100,
+.high-contrast button.bg-neutral-200,
+.high-contrast button.bg-slate-100 {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+  font-weight: 700 !important;
+}
+
+/* High Contrast Badges & Status Chips */
+.high-contrast .bg-emerald-100,
+.high-contrast .bg-emerald-50 {
+  background-color: #e8f5e9 !important;
+  border: 2px solid #004d25 !important;
+  color: #004d25 !important;
+  font-weight: 800 !important;
+}
+
+.high-contrast .bg-amber-100,
+.high-contrast .bg-amber-50 {
+  background-color: #fff9c4 !important;
+  border: 2px solid #7f6000 !important;
+  color: #000000 !important;
+  font-weight: 800 !important;
+}
+
+.high-contrast .bg-rose-100,
+.high-contrast .bg-rose-50 {
+  background-color: #ffebee !important;
+  border: 2px solid #b71c1c !important;
+  color: #b71c1c !important;
+  font-weight: 800 !important;
+}
+
+.high-contrast .bg-blue-100,
+.high-contrast .bg-blue-50 {
+  background-color: #e3f2fd !important;
+  border: 2px solid #0d47a1 !important;
+  color: #0d47a1 !important;
+  font-weight: 800 !important;
+}
+
+/* High Contrast Icon strokes for low-vision clarity */
+.high-contrast svg {
+  stroke-width: 2.2px !important;
+}
+
+/* High Contrast Navigation Bar indicator */
+.high-contrast header {
+  border-bottom: 3px solid #000000 !important;
+}

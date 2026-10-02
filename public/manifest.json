@@ -1,7 +1,7 @@
 {
-  "name": "Bus Ride App",
-  "short_name": "BusRideApp",
-  "description": "Unified virtual bus and intercity ridesharing network connecting regional bus stations across Amhara, Ethiopia.",
+  "name": "ባስ ራይድ",
+  "short_name": "ባስ ራይድ",
+  "description": "Unified virtual bus and intercity ridesharing network connecting regional bus stations.",
   "start_url": "/",
   "id": "/",
   "display": "standalone",

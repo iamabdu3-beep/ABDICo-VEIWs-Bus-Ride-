@@ -14,6 +14,7 @@ import {
   Info,
   Lock,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 
 interface SeatPickerModalProps {
@@ -61,18 +62,29 @@ export const SeatPickerModal: React.FC<SeatPickerModalProps> = ({
 
   const isMinibus = trip.totalSeats <= 16;
   const isCoaster = trip.totalSeats > 16 && trip.totalSeats <= 28;
+  const [seatErrorMessage, setSeatErrorMessage] = useState<string | null>(null);
 
   // Toggle seat selection
   const toggleSeat = (seatNum: number) => {
     if (trip.bookedSeats.includes(seatNum)) {
       triggerHaptic(30);
+      setSeatErrorMessage(t.errSeatAlreadyBooked);
+      setTimeout(() => setSeatErrorMessage(null), 3500);
       return; // occupied
     }
 
     triggerHaptic(12);
     if (selectedSeats.includes(seatNum)) {
+      setSeatErrorMessage(null);
       setSelectedSeats(selectedSeats.filter((s) => s !== seatNum));
     } else {
+      if (selectedSeats.length >= 4) {
+        triggerHaptic(25);
+        setSeatErrorMessage(t.errSeatLimitExceeded);
+        setTimeout(() => setSeatErrorMessage(null), 3500);
+        return;
+      }
+      setSeatErrorMessage(null);
       setSelectedSeats([...selectedSeats, seatNum]);
     }
   };
@@ -482,20 +494,42 @@ export const SeatPickerModal: React.FC<SeatPickerModalProps> = ({
           </div>
 
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
-              {t.seatSelectionTitle}
-            </h3>
-            <span className="text-xs font-mono font-bold text-emerald-800">
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                {t.modalSeatPickerTitle || t.seatSelectionTitle}
+              </h3>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                {t.modalSeatPickerSub}
+              </p>
+            </div>
+            <span className="text-xs font-mono font-bold text-emerald-800 shrink-0">
               {trip.priceETB} ETB / seat
             </span>
           </div>
 
-          <p className="text-xs text-neutral-500 mt-0.5">
+          <p className="text-xs text-neutral-500 mt-1">
             {fromStation ? (lang === 'en' ? fromStation.city : fromStation.cityAm) : ''} ➔{' '}
             {toStation ? (lang === 'en' ? toStation.city : toStation.cityAm) : ''} •{' '}
             {trip.departureTime} • {trip.totalSeats} {lang === 'en' ? 'Seats Capacity' : 'መቀመጫዎች'}
           </p>
         </div>
+
+        {/* Dynamic Seat Selection Error Alert */}
+        {seatErrorMessage && (
+          <div className="mb-3 px-3 py-2 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in duration-150">
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{seatErrorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSeatErrorMessage(null)}
+              className="text-rose-500 hover:text-rose-700 cursor-pointer p-0.5 rounded"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Legend Ribbon & Visual Seat Inspector Bar */}
         <div className="shrink-0 flex flex-col gap-2 mb-3">
@@ -824,17 +858,17 @@ export const SeatPickerModal: React.FC<SeatPickerModalProps> = ({
                 <span className="font-extrabold text-neutral-900">
                   {selectedSeats.length > 0
                     ? selectedSeats.sort((a, b) => a - b).join(', ')
-                    : lang === 'en'
-                    ? 'None selected'
-                    : 'አልተመረጠም'}
+                    : isAm
+                    ? 'አልተመረጠም'
+                    : 'None selected'}
                 </span>
               </div>
 
               <div className="text-base sm:text-lg font-black text-emerald-800 font-mono">
-                {totalFare} ETB
+                {totalFare} {isAm ? 'ብር' : 'ETB'}
                 {selectedSeats.length > 0 && (
                   <span className="text-[11px] font-normal text-neutral-500 font-sans ml-1.5">
-                    ({selectedSeats.length} × {trip.priceETB} ETB)
+                    ({selectedSeats.length} × {trip.priceETB} {isAm ? 'ብር' : 'ETB'})
                   </span>
                 )}
               </div>
@@ -842,29 +876,39 @@ export const SeatPickerModal: React.FC<SeatPickerModalProps> = ({
 
             {selectedSeats.length > 0 && (
               <button
+                type="button"
                 onClick={() => setSelectedSeats([])}
                 className="text-[11px] text-neutral-400 hover:text-neutral-700 underline font-semibold cursor-pointer"
               >
-                {lang === 'en' ? 'Clear' : 'አጽዳ'}
+                {t.btnClear || (isAm ? 'አጽዳ' : 'Clear')}
               </button>
             )}
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={onClose}
               className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition cursor-pointer"
             >
-              {t.cancel}
+              {t.btnCancel || t.cancel}
             </button>
 
             <button
-              disabled={selectedSeats.length === 0}
-              onClick={() => onProceedToCheckout(selectedSeats)}
+              type="button"
+              onClick={() => {
+                if (selectedSeats.length === 0) {
+                  triggerHaptic(30);
+                  setSeatErrorMessage(t.errSelectAtLeastOneSeat);
+                  setTimeout(() => setSeatErrorMessage(null), 3500);
+                  return;
+                }
+                onProceedToCheckout(selectedSeats);
+              }}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-md transition cursor-pointer ${
                 selectedSeats.length > 0
                   ? 'bg-emerald-700 hover:bg-emerald-800 shadow-emerald-700/20 active:scale-98'
-                  : 'bg-neutral-300 cursor-not-allowed text-neutral-500'
+                  : 'bg-neutral-300 hover:bg-neutral-400 text-neutral-600'
               }`}
             >
               <span>{t.proceedToPassengerInfo}</span>
