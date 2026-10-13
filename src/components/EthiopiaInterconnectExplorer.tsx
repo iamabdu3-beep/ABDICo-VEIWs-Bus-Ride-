@@ -53,6 +53,7 @@ export const EthiopiaInterconnectExplorer: React.FC<EthiopiaInterconnectExplorer
   const [selectedTier, setSelectedTier] = useState<StationHierarchyTier | 'all'>('all');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [presetCategory, setPresetCategory] = useState<'all' | 'addis' | 'region' | 'zone' | 'woreda'>('all');
 
   // Interconnect Route Planner State
   const [plannerOriginId, setPlannerOriginId] = useState<string>('sekela-woreda');
@@ -246,6 +247,104 @@ export const EthiopiaInterconnectExplorer: React.FC<EthiopiaInterconnectExplorer
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
               {isAm ? 'ቀጥታ ትኬት አገናኝ' : 'Unified Cross-Tier Booking'}
             </span>
+          </div>
+        </div>
+
+        {/* Quick Corridor Presets Across Tiers */}
+        <div className="mb-4 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider flex items-center gap-1.5">
+              <span>{isAm ? 'ፈጣን የትስስር መሞከሪያ መስመሮች:' : 'Popular Interconnect Presets:'}</span>
+              <span className="text-[10px] text-emerald-800 bg-emerald-100 font-bold px-1.5 py-0.2 rounded-md">
+                {isAm ? 'ሁሉንም ደረጃዎች ያካተተ' : 'All 4 Tiers'}
+              </span>
+            </span>
+
+            {/* Category tabs */}
+            <div className="flex flex-wrap items-center gap-1">
+              {[
+                { id: 'all', labelEn: 'All Corridors', labelAm: 'ሁሉም መስመሮች' },
+                { id: 'addis', labelEn: '➔ Addis Ababa (Federal)', labelAm: '➔ ወደ አዲስ አበባ' },
+                { id: 'region', labelEn: 'Inter-Region', labelAm: 'የክልል-ለክልል' },
+                { id: 'zone', labelEn: 'Inter-Zone', labelAm: 'የዞን-ለዞን' },
+                { id: 'woreda', labelEn: 'Inter-Woreda Feeder', labelAm: 'የወረዳ መስመሮች' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(6);
+                    setPresetCategory(cat.id as any);
+                  }}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                    presetCategory === cat.id
+                      ? 'bg-emerald-800 text-white shadow-2xs'
+                      : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-600'
+                  }`}
+                >
+                  {isAm ? cat.labelAm : cat.labelEn}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              // 1. To Addis Ababa (from woredas, zones, and regions)
+              { from: 'sekela-woreda', to: 'addis-autobis-tera', category: 'addis', labelEn: '🌾 Sekela Woreda ➔ Addis Ababa (Abay Source to Capital)', labelAm: 'ሰከላ ወረዳ ➔ አዲስ አበባ' },
+              { from: 'debark-woreda', to: 'addis-autobis-tera', category: 'addis', labelEn: '⛰️ Debark Woreda ➔ Addis Ababa (Simien to Capital)', labelAm: 'ደባርቅ ወረዳ ➔ አዲስ አበባ' },
+              { from: 'yirgacheffe-woreda', to: 'addis-kality', category: 'addis', labelEn: '☕ Yirgacheffe Woreda ➔ Addis Ababa (Coffee Belt)', labelAm: 'ይርጋጨፌ ወረዳ ➔ አዲስ አበባ' },
+              { from: 'assosa-regional', to: 'addis-autobis-tera', category: 'addis', labelEn: '🌳 Assosa ➔ Addis Ababa (Benishangul to Capital)', labelAm: 'አሶሳ ➔ አዲስ አበባ' },
+              { from: 'semera-regional', to: 'addis-lamberet', category: 'addis', labelEn: '🏜️ Semera ➔ Addis Ababa (Afar Gateway)', labelAm: 'ሰመራ ➔ አዲስ አበባ' },
+              { from: 'mekelle-regional', to: 'addis-autobis-tera', category: 'addis', labelEn: '⭐ Mekelle ➔ Addis Ababa (Tigray to Capital)', labelAm: 'መቐለ ➔ አዲስ አበባ' },
+              { from: 'hawassa-regional', to: 'addis-kality', category: 'addis', labelEn: '⚡ Hawassa ➔ Addis Ababa (Expressway Corridor)', labelAm: 'ሐዋሳ ➔ አዲስ አበባ' },
+              { from: 'jimma-zonal', to: 'addis-ayer-tena', category: 'addis', labelEn: '☕ Jimma ➔ Addis Ababa (Southwest Trunk)', labelAm: 'ጅማ ➔ አዲስ አበባ' },
+              { from: 'dire-dawa-regional', to: 'addis-kality', category: 'addis', labelEn: '🚂 Dire Dawa ➔ Addis Ababa (Eastern Gateway)', labelAm: 'ድሬዳዋ ➔ አዲስ አበባ' },
+              
+              // 2. Inter-Region
+              { from: 'bahir-dar', to: 'hawassa-regional', category: 'region', labelEn: '🌊 Bahir Dar ➔ Hawassa (Amhara ⇄ Sidama Grand Corridor)', labelAm: 'ባሕር ዳር ➔ ሐዋሳ' },
+              { from: 'gondar', to: 'mekelle-regional', category: 'region', labelEn: '🏰 Gondar ➔ Mekelle (Amhara ⇄ Tigray Highway)', labelAm: 'ጎንደር ➔ መቐለ' },
+              { from: 'dire-dawa-regional', to: 'harar-regional', category: 'region', labelEn: '🕌 Dire Dawa ➔ Harar (Charter City ⇄ Harari)', labelAm: 'ድሬዳዋ ➔ ሐረር' },
+              { from: 'dessie', to: 'semera-regional', category: 'region', labelEn: '🚚 Dessie ➔ Semera (Amhara ⇄ Afar Cross-Regional)', labelAm: 'ደሴ ➔ ሰመራ' },
+              { from: 'jimma-zonal', to: 'gambela-regional', category: 'region', labelEn: '🌿 Jimma ➔ Gambela (Oromia ⇄ Gambela Corridor)', labelAm: 'ጅማ ➔ ጋምቤላ' },
+              { from: 'bahir-dar', to: 'assosa-regional', category: 'region', labelEn: '💧 Bahir Dar ➔ Assosa (Amhara ⇄ Benishangul Crossing)', labelAm: 'ባሕር ዳር ➔ አሶሳ' },
+
+              // 3. Inter-Zone
+              { from: 'bahir-dar', to: 'gondar', category: 'zone', labelEn: '🗺️ Bahir Dar ➔ Gondar (West Gojjam ⇄ North Gondar)', labelAm: 'ባሕር ዳር ➔ ጎንደር' },
+              { from: 'dessie', to: 'kombolcha', category: 'zone', labelEn: '🏭 Dessie ➔ Kombolcha (South Wollo Industrial Belt)', labelAm: 'ደሴ ➔ ኮምቦልቻ' },
+              { from: 'finote-selam', to: 'debre-tabor', category: 'zone', labelEn: '🏔️ Finote Selam ➔ Debre Tabor (West Gojjam ⇄ South Gondar)', labelAm: 'ፍኖተ ሰላም ➔ ደብረ ታቦር' },
+              { from: 'hawassa-regional', to: 'dilla-zonal', category: 'zone', labelEn: '🌳 Hawassa ➔ Dilla (Sidama ⇄ Gedeo Zonal Corridor)', labelAm: 'ሐዋሳ ➔ ዲላ' },
+              { from: 'adama-regional', to: 'asella-zonal', category: 'zone', labelEn: '🌾 Adama ➔ Asella (East Shewa ⇄ Arsi Zone)', labelAm: 'አዳማ ➔ አሰላ' },
+              { from: 'arba-minch-regional', to: 'sodo-zonal', category: 'zone', labelEn: '🏞️ Arba Minch ➔ Wolaita Sodo (Gamo ⇄ Wolaita Hub)', labelAm: 'አርባ ምንጭ ➔ ወላይታ ሶዶ' },
+              { from: 'wolkite-zonal', to: 'hosaena-regional', category: 'zone', labelEn: '🌽 Wolkite ➔ Hosaena (Gurage ⇄ Central Ethiopia)', labelAm: 'ወልቂጤ ➔ ሆሳዕና' },
+
+              // 4. Inter-Woreda Feeders
+              { from: 'finote-selam', to: 'bure-woreda', category: 'woreda', labelEn: '🌱 Finote Selam ➔ Bure Woreda (Zonal Hub to Woreda)', labelAm: 'ፍኖተ ሰላም ➔ ቡሬ ወረዳ' },
+              { from: 'bure-woreda', to: 'sekela-woreda', category: 'woreda', labelEn: '🌾 Bure Woreda ➔ Sekela Woreda (Inter-Woreda Feeder)', labelAm: 'ቡሬ ወረዳ ➔ ሰከላ ወረዳ' },
+              { from: 'debre-birhan', to: 'ankober-woreda', category: 'woreda', labelEn: '🏰 Debre Birhan ➔ Ankober Woreda (Escarpment Route)', labelAm: 'ደብረ ብርሃን ➔ አንኮበር ወረዳ' },
+              { from: 'gondar', to: 'metema-woreda', category: 'woreda', labelEn: '🛂 Gondar ➔ Metema Woreda (West Gondar Border)', labelAm: 'ጎንደር ➔ መተማ ወረዳ' },
+              { from: 'jimma-zonal', to: 'agaro-woreda', category: 'woreda', labelEn: '☕ Jimma ➔ Agaro Woreda (Kaffa Highlands Route)', labelAm: 'ጅማ ➔ አጋሮ ወረዳ' },
+              { from: 'kombolcha', to: 'bati-woreda', category: 'woreda', labelEn: '🐪 Kombolcha ➔ Bati Woreda (Historic Camel Market)', labelAm: 'ኮምቦልቻ ➔ ባቲ ወረዳ' },
+            ]
+              .filter((p) => presetCategory === 'all' || p.category === presetCategory)
+              .map((preset, pIdx) => (
+                <button
+                  key={pIdx}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(8);
+                    setPlannerOriginId(preset.from);
+                    setPlannerDestId(preset.to);
+                  }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                    plannerOriginId === preset.from && plannerDestId === preset.to
+                      ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
+                      : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-200'
+                  }`}
+                >
+                  {isAm ? preset.labelAm : preset.labelEn}
+                </button>
+              ))}
           </div>
         </div>
 

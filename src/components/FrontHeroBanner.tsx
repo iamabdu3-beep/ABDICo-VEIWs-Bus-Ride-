@@ -55,10 +55,12 @@ export interface FrontHeroBannerProps {
 }
 
 const POPULAR_CORRIDORS = [
-  { originId: 'bahir-dar', destId: 'gondar', nameEn: 'Bahir Dar ➔ Gondar', nameAm: 'ባሕር ዳር ➔ ጎንደር', duration: '3h 30m' },
-  { originId: 'dessie', destId: 'debre-birhan', nameEn: 'Dessie ➔ Debre Birhan', nameAm: 'ደሴ ➔ ደብረ ብርሃን', duration: '4h 15m' },
-  { originId: 'woldiya', destId: 'lalibela', nameEn: 'Woldiya ➔ Lalibela', nameAm: 'ወልዲያ ➔ ላሊበላ', duration: '3h 00m' },
-  { originId: 'debre-markos', destId: 'addis-ababa', nameEn: 'Debre Markos ➔ Addis Ababa', nameAm: 'ደብረ ማርቆስ ➔ አዲስ አበባ', duration: '5h 30m' },
+  { originId: 'addis-autobis-tera', destId: 'bahir-dar', nameEn: 'Addis Ababa ➔ Bahir Dar', nameAm: 'አዲስ አበባ ➔ ባሕር ዳር', duration: '8h 30m' },
+  { originId: 'addis-kality', destId: 'hawassa-regional', nameEn: 'Addis Ababa ➔ Hawassa', nameAm: 'አዲስ አበባ ➔ ሐዋሳ', duration: '3h 45m' },
+  { originId: 'bahir-dar', destId: 'gondar', nameEn: 'Bahir Dar ➔ Gondar', nameAm: 'ባሕር ዳር ➔ ጎንደር', duration: '3h 00m' },
+  { originId: 'finote-selam', destId: 'bure-woreda', nameEn: 'Finote Selam ➔ Bure Woreda', nameAm: 'ፍኖተ ሰላም ➔ ቡሬ ወረዳ', duration: '50m' },
+  { originId: 'gondar', destId: 'debark-woreda', nameEn: 'Gondar ➔ Debark Woreda', nameAm: 'ጎንደር ➔ ደባርቅ ወረዳ', duration: '2h 15m' },
+  { originId: 'dilla-zonal', destId: 'yirgacheffe-woreda', nameEn: 'Dilla ➔ Yirgacheffe Woreda', nameAm: 'ዲላ ➔ ይርጋጨፌ ወረዳ', duration: '45m' },
 ];
 
 export const FrontHeroBanner: React.FC<FrontHeroBannerProps> = ({

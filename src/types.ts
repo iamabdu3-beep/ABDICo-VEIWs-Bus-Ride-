@@ -537,4 +537,76 @@ export type OwnerModule = 'fleet' | 'financials' | 'dispatch_trip' | 'roster' | 
 
 export type AppModule = UserModule | DriverModule | AdminModule | OwnerModule;
 
+// ========================================================
+// LIVE BUS & USER TRACKING TELEMETRY TYPES
+// ========================================================
+
+export type BusTelemetrySignal = 'rtk_high' | '4g_good' | 'mountain_fringe';
+
+export interface LiveMovingBus {
+  id: string;
+  tripId: string;
+  busCompany: string;
+  busCompanyAm: string;
+  vehicleType: VehicleCategory;
+  plateNumber: string;
+  fromStationId: string;
+  toStationId: string;
+  driverName: string;
+  driverPhone: string;
+  progressPercent: number; // 0 to 100
+  currentSpeedKmH: number;
+  headingDegrees: number; // 0 to 360
+  lat: number;
+  lng: number;
+  currentAltitudeM: number;
+  lastCheckpoint: string;
+  lastCheckpointAm: string;
+  nextCheckpoint: string;
+  nextCheckpointAm: string;
+  totalSeats: number;
+  occupiedSeats: number;
+  estimatedArrivalMin: number;
+  status: 'on_time' | 'ahead' | 'delayed' | 'boarding' | 'approaching_stop';
+  statusLabelEn: string;
+  statusLabelAm: string;
+  highwayCode: string;
+  gpsSignal: BusTelemetrySignal;
+  satellitesLocked: number;
+  routeColor?: string;
+  fuelOrBatteryPercent?: number;
+  cabinTempC?: number;
+}
+
+export type CommuterTrackingStatus =
+  | 'waiting_at_terminal'
+  | 'roadside_beacon'
+  | 'boarded_in_transit'
+  | 'approaching_station';
+
+export interface LiveTrackedCommuter {
+  id: string;
+  name: string;
+  nameAm: string;
+  avatar?: string;
+  phone: string;
+  lat: number;
+  lng: number;
+  currentStationId?: string;
+  currentStationName: string;
+  currentStationNameAm: string;
+  destinationStationId: string;
+  destinationName: string;
+  destinationNameAm: string;
+  status: CommuterTrackingStatus;
+  ticketId?: string;
+  luggageCount: number;
+  waitTimeMinutes: number;
+  pickupNote?: string;
+  isCurrentUser?: boolean;
+  assignedBusId?: string;
+  partySize: number;
+  sharedBeaconBroadcastAt?: string;
+}
+
 

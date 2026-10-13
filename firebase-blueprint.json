@@ -1,0 +1,245 @@
+{
+  "entities": {
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Passenger bus ticket and reservation",
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string",
+          "description": "Unique ticket identification code",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the passenger or booking user",
+          "maxLength": 128
+        },
+        "passengerName": {
+          "type": "string",
+          "description": "Full name of the passenger",
+          "maxLength": 120
+        },
+        "passengerPhone": {
+          "type": "string",
+          "description": "Passenger mobile phone number",
+          "maxLength": 30
+        },
+        "fromStationId": {
+          "type": "string",
+          "description": "Origin bus station identifier",
+          "maxLength": 64
+        },
+        "fromCity": {
+          "type": "string",
+          "description": "Origin terminal city name",
+          "maxLength": 80
+        },
+        "toStationId": {
+          "type": "string",
+          "description": "Destination bus station identifier",
+          "maxLength": 64
+        },
+        "toCity": {
+          "type": "string",
+          "description": "Destination terminal city name",
+          "maxLength": 80
+        },
+        "departureTime": {
+          "type": "string",
+          "description": "Scheduled departure time",
+          "maxLength": 20
+        },
+        "departureDate": {
+          "type": "string",
+          "description": "Scheduled departure date",
+          "maxLength": 20
+        },
+        "seatNumbers": {
+          "type": "string",
+          "description": "Comma separated seat numbers",
+          "maxLength": 50
+        },
+        "totalFareEtb": {
+          "type": "integer",
+          "description": "Total ticket fare in Ethiopian Birr"
+        },
+        "vehicleType": {
+          "type": "string",
+          "description": "Type of vehicle assigned",
+          "maxLength": 50
+        },
+        "busCompany": {
+          "type": "string",
+          "description": "Operating bus company name",
+          "maxLength": 80
+        },
+        "plateNumber": {
+          "type": "string",
+          "description": "Vehicle license plate number",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "description": "Booking status",
+          "enum": ["confirmed", "boarded", "completed", "cancelled"]
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Payment gateway or cash method",
+          "maxLength": 40
+        },
+        "paymentRef": {
+          "type": "string",
+          "description": "Transaction reference number",
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": [
+        "ticketId",
+        "passengerName",
+        "passengerPhone",
+        "fromStationId",
+        "toStationId",
+        "totalFareEtb",
+        "status"
+      ]
+    },
+    "CommuterBeacon": {
+      "title": "CommuterBeacon",
+      "description": "Live roadside pickup beacon flagged by a passenger",
+      "type": "object",
+      "properties": {
+        "beaconId": {
+          "type": "string",
+          "description": "Beacon identifier",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userUid": {
+          "type": "string",
+          "description": "Firebase user UID",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Commuter name",
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "description": "Commuter contact number",
+          "maxLength": 30
+        },
+        "destinationStationId": {
+          "type": "string",
+          "description": "Desired destination terminal",
+          "maxLength": 64
+        },
+        "destinationName": {
+          "type": "string",
+          "description": "Destination city name",
+          "maxLength": 80
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "lng": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        },
+        "pickupNote": {
+          "type": "string",
+          "description": "Roadside landmark or instructions",
+          "maxLength": 200
+        },
+        "status": {
+          "type": "string",
+          "description": "Beacon state",
+          "enum": ["waiting", "picked_up", "cancelled"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when beacon was broadcasted"
+        }
+      },
+      "required": ["beaconId", "name", "phone", "destinationStationId", "status"]
+    },
+    "SheetsSyncLog": {
+      "title": "SheetsSyncLog",
+      "description": "Log entry of data exported to Google Sheets",
+      "type": "object",
+      "properties": {
+        "logId": {
+          "type": "string",
+          "description": "Sync log ID",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userUid": {
+          "type": "string",
+          "description": "User UID who initiated sync",
+          "maxLength": 128
+        },
+        "spreadsheetId": {
+          "type": "string",
+          "description": "Google Spreadsheet ID",
+          "maxLength": 128
+        },
+        "spreadsheetUrl": {
+          "type": "string",
+          "description": "Direct Google Spreadsheet URL",
+          "maxLength": 300
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the exported sheet",
+          "maxLength": 120
+        },
+        "recordsCount": {
+          "type": "integer",
+          "description": "Number of records synced"
+        },
+        "exportType": {
+          "type": "string",
+          "description": "Type of dataset exported",
+          "enum": ["manifest", "telemetry", "stations"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of export"
+        }
+      },
+      "required": ["logId", "spreadsheetId", "spreadsheetUrl", "title", "recordsCount", "exportType"]
+    }
+  },
+  "firestore": {
+    "/tickets/{ticketId}": {
+      "schema": {
+        "$ref": "#/entities/Ticket"
+      },
+      "description": "Collection of passenger transit tickets"
+    },
+    "/commuter_beacons/{beaconId}": {
+      "schema": {
+        "$ref": "#/entities/CommuterBeacon"
+      },
+      "description": "Collection of passenger roadside pickup beacons"
+    },
+    "/sheets_sync_logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/SheetsSyncLog"
+      },
+      "description": "Collection of Google Sheets export sync logs"
+    }
+  }
+}

@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Ticket validation helper
+    function isValidTicket(data) {
+      return data.ticketId is string && data.ticketId.size() > 0 && data.ticketId.size() <= 64 &&
+             data.passengerName is string && data.passengerName.size() > 0 && data.passengerName.size() <= 120 &&
+             data.passengerPhone is string && data.passengerPhone.size() > 0 && data.passengerPhone.size() <= 30 &&
+             data.fromStationId is string && data.fromStationId.size() > 0 && data.fromStationId.size() <= 64 &&
+             data.toStationId is string && data.toStationId.size() > 0 && data.toStationId.size() <= 64 &&
+             data.totalFareEtb is int && data.totalFareEtb >= 0 &&
+             data.status in ['confirmed', 'boarded', 'completed', 'cancelled'];
+    }
+
+    // Commuter Beacon validation helper
+    function isValidBeacon(data) {
+      return data.beaconId is string && data.beaconId.size() > 0 && data.beaconId.size() <= 64 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30 &&
+             data.destinationStationId is string && data.destinationStationId.size() > 0 && data.destinationStationId.size() <= 64 &&
+             data.status in ['waiting', 'picked_up', 'cancelled'];
+    }
+
+    // Sheets Sync Log validation helper
+    function isValidSheetsLog(data) {
+      return data.logId is string && data.logId.size() > 0 && data.logId.size() <= 64 &&
+             data.spreadsheetId is string && data.spreadsheetId.size() > 0 && data.spreadsheetId.size() <= 128 &&
+             data.spreadsheetUrl is string && data.spreadsheetUrl.size() > 0 && data.spreadsheetUrl.size() <= 300 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 120 &&
+             data.recordsCount is int && data.recordsCount >= 0 &&
+             data.exportType in ['manifest', 'telemetry', 'stations'];
+    }
+
+    // Tickets collection
+    match /tickets/{ticketId} {
+      allow get: if isValidId(ticketId);
+      allow list: if true;
+      allow create: if isValidId(ticketId) &&
+                       isValidTicket(incoming()) &&
+                       incoming().ticketId == ticketId;
+      allow update: if isValidId(ticketId) &&
+                       isValidTicket(incoming()) &&
+                       incoming().ticketId == existing().ticketId &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Commuter roadside beacons collection
+    match /commuter_beacons/{beaconId} {
+      allow get, list: if true;
+      allow create: if isValidId(beaconId) &&
+                       isValidBeacon(incoming()) &&
+                       incoming().beaconId == beaconId;
+      allow update: if isValidId(beaconId) &&
+                       isValidBeacon(incoming()) &&
+                       incoming().beaconId == existing().beaconId &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'pickupNote']);
+      allow delete: if isValidId(beaconId);
+    }
+
+    // Google Sheets sync logs collection
+    match /sheets_sync_logs/{logId} {
+      allow get, list: if true;
+      allow create: if isValidId(logId) &&
+                       isValidSheetsLog(incoming()) &&
+                       incoming().logId == logId;
+      allow update, delete: if false;
+    }
+  }
+}

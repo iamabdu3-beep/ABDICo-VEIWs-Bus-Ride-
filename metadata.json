@@ -1,6 +1,6 @@
 {
   "name": "Bus Ride App",
-  "description": "Virtual bus transport and intercity ridesharing network connecting all major bus stations across the Amhara region of Ethiopia.",
+  "description": "Virtual bus transport, live bus and commuter tracking mapping, and intercity ridesharing network interconnecting Federal, Regional, Zonal, and Woreda bus stations across Ethiopia.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

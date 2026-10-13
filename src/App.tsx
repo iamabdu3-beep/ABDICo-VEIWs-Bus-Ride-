@@ -862,7 +862,13 @@ export default function App() {
       {/* Main Global Navigation */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          if (['booking', 'planner', 'interconnect', 'map', 'tracker', 'directory', 'carpool'].includes(tab)) {
+            setCurrentCategory('users');
+            setActiveModule(tab as any);
+          }
+        }}
         lang={lang}
         setLang={setLang}
         ticketCount={tickets.length}
@@ -1057,6 +1063,9 @@ export default function App() {
                 trips={trips}
                 onBookTrip={(trip) => setSeatPickerTrip(trip)}
                 onViewTripOnMap={handleViewRouteOnMap}
+                currentUser={currentUser}
+                onBookStations={handleBookFromStation}
+                userTickets={tickets}
               />
             )}
 

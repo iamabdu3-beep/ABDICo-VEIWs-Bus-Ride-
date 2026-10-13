@@ -176,7 +176,11 @@ export const StationDirectory: React.FC<StationDirectoryProps> = ({
         station.nameAm.includes(term) ||
         station.city.toLowerCase().includes(term) ||
         station.cityAm.includes(term) ||
-        station.zone.toLowerCase().includes(term);
+        station.zone.toLowerCase().includes(term) ||
+        (station.regionName && station.regionName.toLowerCase().includes(term)) ||
+        (station.regionNameAm && station.regionNameAm.includes(term)) ||
+        (station.woredaName && station.woredaName.toLowerCase().includes(term)) ||
+        (station.woredaNameAm && station.woredaNameAm.includes(term));
 
       const matchesZone = selectedZone === 'all' || station.zone === selectedZone;
       const matchesTier = selectedTier === 'all' || station.hierarchyTier === selectedTier;

@@ -260,10 +260,10 @@ export function generatePlannedTrips(
         toId: destId,
         distanceKm: estDistance,
         durationHrs: estDuration,
-        highwayCode: 'Amhara Regional Highway Network',
-        terrain: 'Highland Plateau & Valleys',
-        terrainAm: 'የአማራ ደጋና ሸለቆ መንገዶች',
-        scenicPoints: ['Regional Escarpment View', 'Highland Plains'],
+        highwayCode: 'National Interconnect Transit Corridor',
+        terrain: 'Highland Plateau, Rift Valley & Scenic Corridors',
+        terrainAm: 'የኢትዮጵያ አገር አቀፍ የተሳሰረ የትራንስፖርት መስመር',
+        scenicPoints: ['National Highway Corridor', 'Interstate Scenic Lookout'],
       },
     ]);
   }

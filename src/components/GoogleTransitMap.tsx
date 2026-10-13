@@ -7,11 +7,12 @@ import {
   Polyline,
   useMap,
 } from '@vis.gl/react-google-maps';
-import { BusStation, RideTrip, Language, TerminalTrafficStatus } from '../types';
+import { BusStation, RideTrip, Language, TerminalTrafficStatus, LiveMovingBus, LiveTrackedCommuter } from '../types';
 import { AMHARA_STATIONS, ROUTE_CONNECTIONS } from '../data/amharaStations';
 import { CITY_BUS_STOPS, CityBusStop } from '../data/cityBusStops';
 import { getCongestionConfig, getTerminalTraffic } from '../data/terminalTraffic';
 import { computeTransitRoute, queryTransitAgent, RoutePlanResult } from '../utils/transitAgent';
+import { INITIAL_LIVE_BUSES, INITIAL_COMMUTERS, advanceBusTelemetry } from '../data/liveTrackingData';
 import { triggerHaptic } from '../utils/haptics';
 import {
   Bus,
@@ -32,6 +33,8 @@ import {
   Map as MapIcon,
   Crosshair,
   ExternalLink,
+  Radio,
+  Users,
 } from 'lucide-react';
 
 interface GoogleTransitMapProps {
@@ -80,6 +83,20 @@ export const GoogleTransitMap: React.FC<GoogleTransitMapProps> = ({
   const [mapType, setMapType] = useState<google.maps.MapTypeId | 'roadmap' | 'satellite' | 'hybrid' | 'terrain'>('terrain');
   const [showCityStops, setShowCityStops] = useState<boolean>(true);
   const [showAgentPanel, setShowAgentPanel] = useState<boolean>(false);
+  const [showLiveTracking, setShowLiveTracking] = useState<boolean>(true);
+  const [liveBuses, setLiveBuses] = useState<LiveMovingBus[]>(INITIAL_LIVE_BUSES);
+  const [liveCommuters, setLiveCommuters] = useState<LiveTrackedCommuter[]>(INITIAL_COMMUTERS);
+  const [selectedLiveBus, setSelectedLiveBus] = useState<LiveMovingBus | null>(null);
+  const [selectedLiveCommuter, setSelectedLiveCommuter] = useState<LiveTrackedCommuter | null>(null);
+
+  // Interval timer for real-time bus telemetry updates on Google Map
+  useEffect(() => {
+    if (!showLiveTracking) return;
+    const interval = setInterval(() => {
+      setLiveBuses((prev) => advanceBusTelemetry(prev, 1.0));
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [showLiveTracking]);
 
   // Selected station / InfoWindow state
   const [activeStation, setActiveStation] = useState<BusStation | null>(
@@ -209,8 +226,30 @@ export const GoogleTransitMap: React.FC<GoogleTransitMapProps> = ({
           ))}
         </div>
 
-        {/* Right: City Stops Toggle & Transit Agent Launcher */}
+        {/* Right: Live Telemetry, City Stops Toggle & Transit Agent Launcher */}
         <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
+          {/* Live Telemetry Fleet & Commuters Toggle */}
+          <button
+            onClick={() => {
+              triggerHaptic(10);
+              setShowLiveTracking(!showLiveTracking);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition cursor-pointer shadow-md ${
+              showLiveTracking
+                ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/50'
+                : 'bg-slate-900/90 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title={lang === 'en' ? 'Toggle Live Moving Buses and Tracked Commuters' : 'የቀጥታ አውቶቡሶችና ተሳፋሪዎች'}
+          >
+            <Radio className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+            <span>{lang === 'en' ? 'Live Telemetry' : 'የቀጥታ ራዳር'}</span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                showLiveTracking ? 'bg-emerald-400' : 'bg-slate-600'
+              }`}
+            />
+          </button>
+
           {/* City Bus Stops Toggle */}
           <button
             onClick={() => {
@@ -560,6 +599,115 @@ export const GoogleTransitMap: React.FC<GoogleTransitMapProps> = ({
               <div className="mt-2 pt-1 border-t border-neutral-100 flex items-center justify-between text-[10px] text-neutral-500 font-mono">
                 <span>{selectedCityStop.linesCount} lines</span>
                 <span className="text-cyan-700 font-bold">{selectedCityStop.city}</span>
+              </div>
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* Live Moving Buses Layer on Google Maps */}
+        {showLiveTracking &&
+          liveBuses.map((bus) => (
+            <AdvancedMarker
+              key={bus.id}
+              position={{ lat: bus.lat, lng: bus.lng }}
+              onClick={() => {
+                triggerHaptic(8);
+                setSelectedLiveBus(bus);
+                setSelectedLiveCommuter(null);
+                setInfoWindowStation(null);
+              }}
+            >
+              <div className="relative group cursor-pointer flex flex-col items-center">
+                <div
+                  className="px-2 py-0.5 rounded-full text-white text-[10px] font-bold shadow-md flex items-center gap-1 border border-white/60"
+                  style={{ backgroundColor: bus.routeColor || '#059669' }}
+                >
+                  <Bus className="w-3 h-3 text-amber-300" />
+                  <span>{bus.currentSpeedKmH} km/h</span>
+                </div>
+                <div className="w-2.5 h-2.5 rounded-full bg-white border-2 border-slate-900 -mt-0.5" />
+              </div>
+            </AdvancedMarker>
+          ))}
+
+        {/* Live Commuters Layer on Google Maps */}
+        {showLiveTracking &&
+          liveCommuters.map((commuter) => (
+            <AdvancedMarker
+              key={commuter.id}
+              position={{ lat: commuter.lat, lng: commuter.lng }}
+              onClick={() => {
+                triggerHaptic(8);
+                setSelectedLiveCommuter(commuter);
+                setSelectedLiveBus(null);
+                setInfoWindowStation(null);
+              }}
+            >
+              <div className="p-1.5 rounded-full bg-amber-500 text-white shadow-md border-2 border-white cursor-pointer animate-pulse">
+                <Users className="w-3.5 h-3.5" />
+              </div>
+            </AdvancedMarker>
+          ))}
+
+        {/* Live Bus InfoWindow */}
+        {selectedLiveBus && (
+          <InfoWindow
+            position={{ lat: selectedLiveBus.lat, lng: selectedLiveBus.lng }}
+            onCloseClick={() => setSelectedLiveBus(null)}
+            maxWidth={280}
+          >
+            <div className="p-1.5 text-slate-900 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-sm text-neutral-900">
+                  {lang === 'en' ? selectedLiveBus.busCompany : selectedLiveBus.busCompanyAm}
+                </span>
+                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  {selectedLiveBus.currentSpeedKmH} km/h
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-600 font-mono">
+                {selectedLiveBus.plateNumber} · {selectedLiveBus.vehicleType}
+              </p>
+              <div className="text-[11px] bg-neutral-100 p-1.5 rounded">
+                <span>Passing: <strong>{selectedLiveBus.lastCheckpoint}</strong></span>
+                <br />
+                <span>Next: <strong className="text-emerald-700">{selectedLiveBus.nextCheckpoint}</strong></span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-neutral-200">
+                <span>Seats: <strong>{selectedLiveBus.occupiedSeats}/{selectedLiveBus.totalSeats}</strong></span>
+                <span className="font-mono text-cyan-800 font-bold">ETA ~{selectedLiveBus.estimatedArrivalMin}m</span>
+              </div>
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* Live Commuter InfoWindow */}
+        {selectedLiveCommuter && (
+          <InfoWindow
+            position={{ lat: selectedLiveCommuter.lat, lng: selectedLiveCommuter.lng }}
+            onCloseClick={() => setSelectedLiveCommuter(null)}
+            maxWidth={260}
+          >
+            <div className="p-1.5 text-slate-900 text-xs space-y-1">
+              <span className="inline-block px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded text-[10px] font-semibold">
+                {lang === 'en' ? 'Commuter Radar' : 'የተሳፋሪ መረጃ'}
+              </span>
+              <h4 className="font-bold text-neutral-900">
+                {lang === 'en' ? selectedLiveCommuter.name : selectedLiveCommuter.nameAm}
+              </h4>
+              <p className="text-[11px] text-neutral-600">
+                To: <strong className="text-emerald-800">{selectedLiveCommuter.destinationName}</strong>
+              </p>
+              {selectedLiveCommuter.pickupNote && (
+                <p className="text-[10px] text-neutral-500 italic">
+                  "{selectedLiveCommuter.pickupNote}"
+                </p>
+              )}
+              <div className="pt-1 border-t border-neutral-200 flex items-center justify-between">
+                <span className="text-[10px] text-neutral-500">Wait: ~{selectedLiveCommuter.waitTimeMinutes}m</span>
+                <a href={`tel:${selectedLiveCommuter.phone}`} className="text-emerald-700 font-bold text-[11px]">
+                  Call {selectedLiveCommuter.phone}
+                </a>
               </div>
             </div>
           </InfoWindow>

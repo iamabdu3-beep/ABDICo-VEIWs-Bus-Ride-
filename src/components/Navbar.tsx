@@ -26,6 +26,7 @@ import {
   Phone,
   Briefcase,
   ArrowRightLeft,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { AppCategory, Language, UserProfile, UserRole } from '../types';
 import { translations } from '../translations';
@@ -63,6 +64,7 @@ interface NavbarProps {
   onOpenSmsBooking?: () => void;
   preferredTerminalName?: string;
   preferredTerminalStatus?: 'normal' | 'delayed' | 'cancelled';
+  onOpenGoogleSheets?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -92,6 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenUssdDialer,
   onOpenCallCenter,
   onOpenSmsBooking,
+  onOpenGoogleSheets,
   currentCategory = 'users',
   onSelectCategory,
   preferredTerminalName,
@@ -390,6 +393,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               {preferredTerminalStatus !== 'normal' && (
                 <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
               )}
+            </button>
+          )}
+
+          {/* Google Sheets Sync Button */}
+          {onOpenGoogleSheets && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(10);
+                onOpenGoogleSheets();
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition cursor-pointer"
+              title="Google Sheets Manifest & Telemetry Sync"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden lg:inline">
+                {isAm ? 'Google ስፕረድሺት' : 'Sheets'}
+              </span>
             </button>
           )}
 

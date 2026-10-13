@@ -45,6 +45,7 @@ export const SeatPickerModal: React.FC<SeatPickerModalProps> = ({
   onProceedToCheckout,
 }) => {
   const t = translations[lang];
+  const isAm = lang === 'am';
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [hoveredSeat, setHoveredSeat] = useState<SeatMeta | null>(null);
 

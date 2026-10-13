@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BusStation, RideTrip, VehicleCategory, Language, DriverContactContext, WeatherAlert } from '../types';
 import { AMHARA_STATIONS } from '../data/amharaStations';
 import { INITIAL_WEATHER_ALERTS, checkCorridorSevereWeather } from '../data/weatherAlerts';
@@ -31,8 +31,10 @@ import {
   Zap,
   Smartphone,
   Headphones,
+  GitMerge,
 } from 'lucide-react';
 import { parseTimeToMinutes } from '../utils/departureScheduler';
+import { traceInterconnectRoute } from '../data/ethiopiaStations';
 
 export type TripSortOption = 'earliest_departure' | 'lowest_price' | 'fastest_duration';
 
@@ -143,6 +145,8 @@ export const RideBooking: React.FC<RideBookingProps> = ({
     localWeatherAlerts
   );
 
+  const [popularCategory, setPopularCategory] = useState<'all' | 'addis' | 'region' | 'zone' | 'woreda'>('all');
+
   const vehicleCategories: { id: string; labelEn: string; labelAm: string }[] = [
     { id: 'all', labelEn: 'All Vehicles', labelAm: 'ሁሉም ተሽከርካሪዎች' },
     { id: 'Luxury Coach', labelEn: 'Luxury Coach (49 Seats)', labelAm: 'የቅንጦት አውቶቡስ' },
@@ -151,13 +155,45 @@ export const RideBooking: React.FC<RideBookingProps> = ({
     { id: 'Coaster Bus', labelEn: 'Coaster (24 Seats)', labelAm: 'ኮስተር አውቶቡስ' },
   ];
 
-  const popularCorridors = [
-    { from: 'bahir-dar', to: 'gondar', labelEn: 'Bahir Dar ⇄ Gondar (Lake Tana)', labelAm: 'ባሕር ዳር ⇄ ጎንደር' },
-    { from: 'dessie', to: 'debre-birhan', labelEn: 'Dessie ⇄ Debre Birhan', labelAm: 'ደሴ ⇄ ደብረ ብርሃን' },
-    { from: 'bahir-dar', to: 'debre-markos', labelEn: 'Bahir Dar ⇄ Debre Markos', labelAm: 'ባሕር ዳር ⇄ ደብረ ማርቆስ' },
-    { from: 'woldiya', to: 'lalibela', labelEn: 'Woldiya ⇄ Lalibela', labelAm: 'ወልዲያ ⇄ ላሊበላ' },
-    { from: 'dessie', to: 'kombolcha', labelEn: 'Dessie ⇄ Kombolcha (Express)', labelAm: 'ደሴ ⇄ ኮምቦልቻ' },
-    { from: 'bahir-dar', to: 'debre-tabor', labelEn: 'Bahir Dar ⇄ Debre Tabor', labelAm: 'ባሕር ዳር ⇄ ደብረ ታቦር' },
+  const popularCorridors: {
+    from: string;
+    to: string;
+    category: 'addis' | 'region' | 'zone' | 'woreda';
+    labelEn: string;
+    labelAm: string;
+  }[] = [
+    // 1. Intercity to Addis Ababa
+    { from: 'addis-autobis-tera', to: 'bahir-dar', category: 'addis', labelEn: 'Addis Ababa ⇄ Bahir Dar (Trunk A3)', labelAm: 'አዲስ አበባ ⇄ ባሕር ዳር' },
+    { from: 'addis-kality', to: 'hawassa-regional', category: 'addis', labelEn: 'Addis Ababa ⇄ Hawassa (Expressway)', labelAm: 'አዲስ አበባ ⇄ ሐዋሳ' },
+    { from: 'addis-kality', to: 'adama-regional', category: 'addis', labelEn: 'Addis Ababa ⇄ Adama (Fast Toll)', labelAm: 'አዲስ አበባ ⇄ አዳማ' },
+    { from: 'addis-lamberet', to: 'dessie', category: 'addis', labelEn: 'Addis Ababa ⇄ Dessie (A2 Highway)', labelAm: 'አዲስ አበባ ⇄ ደሴ' },
+    { from: 'addis-autobis-tera', to: 'mekelle-regional', category: 'addis', labelEn: 'Addis Ababa ⇄ Mekelle (Tigray Express)', labelAm: 'አዲስ አበባ ⇄ መቐለ' },
+    { from: 'addis-ayer-tena', to: 'jimma-zonal', category: 'addis', labelEn: 'Addis Ababa ⇄ Jimma (Southwest)', labelAm: 'አዲስ አበባ ⇄ ጅማ' },
+    { from: 'addis-autobis-tera', to: 'assosa-regional', category: 'addis', labelEn: 'Addis Ababa ⇄ Assosa (Benishangul)', labelAm: 'አዲስ አበባ ⇄ አሶሳ' },
+    { from: 'addis-lamberet', to: 'semera-regional', category: 'addis', labelEn: 'Addis Ababa ⇄ Semera (Afar Corridor)', labelAm: 'አዲስ አበባ ⇄ ሰመራ' },
+    { from: 'addis-kality', to: 'dire-dawa-regional', category: 'addis', labelEn: 'Addis Ababa ⇄ Dire Dawa (Eastern Hub)', labelAm: 'አዲስ አበባ ⇄ ድሬዳዋ' },
+    // 2. Intercity across Regions
+    { from: 'bahir-dar', to: 'hawassa-regional', category: 'region', labelEn: 'Bahir Dar ⇄ Hawassa (Inter-Regional)', labelAm: 'ባሕር ዳር ⇄ ሐዋሳ' },
+    { from: 'gondar', to: 'mekelle-regional', category: 'region', labelEn: 'Gondar ⇄ Mekelle (Amhara-Tigray)', labelAm: 'ጎንደር ⇄ መቐለ' },
+    { from: 'dire-dawa-regional', to: 'harar-regional', category: 'region', labelEn: 'Dire Dawa ⇄ Harar (Eastern Twin)', labelAm: 'ድሬዳዋ ⇄ ሐረር' },
+    { from: 'dessie', to: 'semera-regional', category: 'region', labelEn: 'Dessie ⇄ Semera (Afar Corridor)', labelAm: 'ደሴ ⇄ ሰመራ' },
+    { from: 'jimma-zonal', to: 'gambela-regional', category: 'region', labelEn: 'Jimma ⇄ Gambela (Forest Expressway)', labelAm: 'ጅማ ⇄ ጋምቤላ' },
+    { from: 'bahir-dar', to: 'assosa-regional', category: 'region', labelEn: 'Bahir Dar ⇄ Assosa (Blue Nile Crossing)', labelAm: 'ባሕር ዳር ⇄ አሶሳ' },
+    // 3. Intercity across Zones
+    { from: 'bahir-dar', to: 'gondar', category: 'zone', labelEn: 'Bahir Dar ⇄ Gondar (West Gojjam to North Gondar)', labelAm: 'ባሕር ዳር ⇄ ጎንደር' },
+    { from: 'dessie', to: 'kombolcha', category: 'zone', labelEn: 'Dessie ⇄ Kombolcha (South Wollo)', labelAm: 'ደሴ ⇄ ኮምቦልቻ' },
+    { from: 'finote-selam', to: 'debre-tabor', category: 'zone', labelEn: 'Finote Selam ⇄ Debre Tabor (Cross-Zone)', labelAm: 'ፍኖተ ሰላም ⇄ ደብረ ታቦር' },
+    { from: 'hawassa-regional', to: 'dilla-zonal', category: 'zone', labelEn: 'Hawassa ⇄ Dilla (Sidama to Gedeo Zone)', labelAm: 'ሐዋሳ ⇄ ዲላ' },
+    { from: 'adama-regional', to: 'asella-zonal', category: 'zone', labelEn: 'Adama ⇄ Asella (East Shewa to Arsi Zone)', labelAm: 'አዳማ ⇄ አሰላ' },
+    { from: 'arba-minch-regional', to: 'sodo-zonal', category: 'zone', labelEn: 'Arba Minch ⇄ Wolaita Sodo (Southern Corridor)', labelAm: 'አርባ ምንጭ ⇄ ወላይታ ሶዶ' },
+    // 4. Intercity across Woredas
+    { from: 'finote-selam', to: 'bure-woreda', category: 'woreda', labelEn: 'Finote Selam ⇄ Bure Woreda', labelAm: 'ፍኖተ ሰላም ⇄ ቡሬ ወረዳ' },
+    { from: 'bure-woreda', to: 'sekela-woreda', category: 'woreda', labelEn: 'Bure Woreda ⇄ Sekela Woreda (Abay Source)', labelAm: 'ቡሬ ወረዳ ⇄ ሰከላ ወረዳ' },
+    { from: 'gondar', to: 'debark-woreda', category: 'woreda', labelEn: 'Gondar ⇄ Debark Woreda (Simien Gateway)', labelAm: 'ጎንደር ⇄ ደባርቅ ወረዳ' },
+    { from: 'dilla-zonal', to: 'yirgacheffe-woreda', category: 'woreda', labelEn: 'Dilla ⇄ Yirgacheffe Woreda (Coffee Belt)', labelAm: 'ዲላ ⇄ ይርጋጨፌ ወረዳ' },
+    { from: 'debre-birhan', to: 'ankober-woreda', category: 'woreda', labelEn: 'Debre Birhan ⇄ Ankober Woreda (Historic)', labelAm: 'ደብረ ብርሃን ⇄ አንኮበር ወረዳ' },
+    { from: 'gondar', to: 'metema-woreda', category: 'woreda', labelEn: 'Gondar ⇄ Metema Woreda (Sudan Border)', labelAm: 'ጎንደር ⇄ መተማ ወረዳ' },
+    { from: 'jimma-zonal', to: 'agaro-woreda', category: 'woreda', labelEn: 'Jimma ⇄ Agaro Woreda (Kaffa Route)', labelAm: 'ጅማ ⇄ አጋሮ ወረዳ' },
   ];
 
   const handleSwapStations = () => {
@@ -257,6 +293,13 @@ export const RideBooking: React.FC<RideBookingProps> = ({
     (t) => t.totalSeats - t.bookedSeats.length <= 0
   ).length;
 
+  const interconnectSuggestion = useMemo(() => {
+    if (originStationId && destStationId && originStationId !== destStationId) {
+      return traceInterconnectRoute(originStationId, destStationId);
+    }
+    return null;
+  }, [originStationId, destStationId]);
+
   return (
     <div className="space-y-6">
       {/* Search Bar Container */}
@@ -290,7 +333,9 @@ export const RideBooking: React.FC<RideBookingProps> = ({
           </div>
 
           <div className="text-xs text-neutral-500 font-medium">
-            {lang === 'en' ? 'Connecting 15 Amhara Terminals' : '15 የአማራ መናኸሪያዎችን በማገናኘት ላይ'}
+            {lang === 'en'
+              ? 'Interconnecting 65+ Federal, Regional, Zonal & Woreda Hubs Across Ethiopia'
+              : 'ከ65+ በላይ የኢትዮጵያ ፌደራል፣ ክልል፣ ዞንና ወረዳ መናኸሪያዎችን በማገናኘት ላይ'}
           </div>
         </div>
 
@@ -442,33 +487,72 @@ export const RideBooking: React.FC<RideBookingProps> = ({
           </div>
         </div>
 
-        {/* Popular Route Shortcuts */}
-        <div className="mt-4 pt-3 border-t border-neutral-100 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-neutral-500 font-medium">
-            {t.popularRoutes}:
-          </span>
-          {popularCorridors.map((corridor, idx) => {
-            const hasAlert =
-              localWeatherAlerts[corridor.from]?.isActive ||
-              localWeatherAlerts[corridor.to]?.isActive;
-            return (
-              <button
-                key={idx}
-                onClick={() => {
-                  setOriginStationId(corridor.from);
-                  setDestStationId(corridor.to);
-                }}
-                className={`px-2.5 py-1 rounded-lg border transition cursor-pointer font-medium text-[11px] flex items-center gap-1 ${
-                  hasAlert
-                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
-                    : 'bg-neutral-100 hover:bg-emerald-50 hover:text-emerald-800 text-neutral-700 border-neutral-200'
-                }`}
-              >
-                {hasAlert && <span className="text-[10px]">⚠️</span>}
-                <span>{lang === 'en' ? corridor.labelEn : corridor.labelAm}</span>
-              </button>
-            );
-          })}
+        {/* Popular Route Shortcuts with Category Tabs */}
+        <div className="mt-4 pt-3 border-t border-neutral-100 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-neutral-600 font-bold flex items-center gap-1.5">
+              <span>{t.popularRoutes}</span>
+              <span className="text-[10px] text-emerald-800 bg-emerald-100 font-bold px-1.5 py-0.2 rounded-md">
+                {lang === 'en' ? 'Intercity Network' : 'የከተሞች ትስስር'}
+              </span>
+            </span>
+
+            {/* Category Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1">
+              {[
+                { id: 'all', labelEn: 'All', labelAm: 'ሁሉም' },
+                { id: 'addis', labelEn: 'To Addis Ababa', labelAm: 'ወደ አዲስ አበባ' },
+                { id: 'region', labelEn: 'Inter-Region', labelAm: 'የክልል-ለክልል' },
+                { id: 'zone', labelEn: 'Inter-Zone', labelAm: 'የዞን-ለዞን' },
+                { id: 'woreda', labelEn: 'Woreda Feeders', labelAm: 'የወረዳ መስመሮች' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setPopularCategory(cat.id as any)}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                    popularCategory === cat.id
+                      ? 'bg-emerald-800 text-white shadow-2xs'
+                      : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-600'
+                  }`}
+                >
+                  {lang === 'en' ? cat.labelEn : cat.labelAm}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            {popularCorridors
+              .filter((c) => popularCategory === 'all' || c.category === popularCategory)
+              .map((corridor, idx) => {
+                const hasAlert =
+                  localWeatherAlerts[corridor.from]?.isActive ||
+                  localWeatherAlerts[corridor.to]?.isActive;
+                const isSelected =
+                  originStationId === corridor.from && destStationId === corridor.to;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setOriginStationId(corridor.from);
+                      setDestStationId(corridor.to);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg border transition cursor-pointer font-medium text-[11px] flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-emerald-800 text-white border-emerald-900 shadow-2xs'
+                        : hasAlert
+                        ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                        : 'bg-neutral-50 hover:bg-emerald-50 hover:text-emerald-800 text-neutral-700 border-neutral-200'
+                    }`}
+                  >
+                    {hasAlert && <span className="text-[10px]">⚠️</span>}
+                    <span>{lang === 'en' ? corridor.labelEn : corridor.labelAm}</span>
+                  </button>
+                );
+              })}
+          </div>
         </div>
       </div>
 
@@ -933,6 +1017,110 @@ export const RideBooking: React.FC<RideBookingProps> = ({
               </div>
             );
           })}
+        </div>
+      ) : interconnectSuggestion && interconnectSuggestion.transferLegs.length > 0 ? (
+        /* Multi-Leg Interconnect Solution Card when no direct bus */
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-emerald-300 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-100/50 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="p-2.5 rounded-xl bg-emerald-800 text-white shadow-xs">
+                <GitMerge className="w-5 h-5 text-emerald-200" />
+              </span>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  {lang === 'en' ? 'Interconnect Route Trace' : 'የተሳሰረ የትራንዚት ጉዞ ተገኝቷል'}
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-neutral-900 mt-0.5">
+                  {lang === 'en'
+                    ? `Connecting Multi-Leg Journey via ${interconnectSuggestion.transferLegs.length - 1} Transfer(s)`
+                    : `በ${interconnectSuggestion.transferLegs.length - 1} ቅብብል የተገናኘ የጉዞ መስመር`}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-neutral-50 px-3.5 py-1.5 rounded-xl border border-neutral-200 text-xs">
+              <div>
+                <span className="text-neutral-500 block text-[10px]">{lang === 'en' ? 'Est. Total Time' : 'የሚፈጀው ሰዓት'}</span>
+                <strong className="text-neutral-900 font-mono font-bold">~{interconnectSuggestion.totalEstimatedHours}h</strong>
+              </div>
+              <div className="w-px h-6 bg-neutral-200" />
+              <div>
+                <span className="text-neutral-500 block text-[10px]">{lang === 'en' ? 'Est. Combined Fare' : 'አጠቃላይ ዋጋ'}</span>
+                <strong className="text-emerald-800 font-mono font-extrabold">{interconnectSuggestion.totalEstimatedFareETB} ETB</strong>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-neutral-600 mb-4">
+            {lang === 'en'
+              ? 'No single direct coach operates on this exact pair at this hour, but our nationwide bus hierarchy connects this route with scheduled transfers:'
+              : 'በዚህ ሰዓት ቀጥተኛ አንድ አውቶቡስ ባይኖርም፤ የኢትዮጵያ የተቀናጀ የትራንስፖርት መረብ በሚከተለው ቅብብል ያገናኛል፡'}
+          </p>
+
+          {/* Stepper display of transfer legs */}
+          <div className="space-y-3 mb-6 bg-neutral-50 p-4 rounded-2xl border border-neutral-200">
+            {interconnectSuggestion.transferLegs.map((leg, idx) => (
+              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white rounded-xl border border-neutral-200 text-xs shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-emerald-800 text-white font-bold flex items-center justify-center text-[11px] shrink-0">
+                    {idx + 1}
+                  </span>
+                  <div>
+                    <div className="font-extrabold text-neutral-900 text-xs sm:text-sm flex items-center gap-1.5">
+                      <span>{lang === 'en' ? leg.from.city : leg.from.cityAm}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>{lang === 'en' ? leg.to.city : leg.to.cityAm}</span>
+                    </div>
+                    <span className="text-[11px] text-emerald-800 font-bold block">
+                      {leg.tierHop}
+                    </span>
+                    <span className="text-[10px] text-neutral-500 block">
+                      {leg.vehicleRecommendation} · {leg.highwayName}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 sm:text-right shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-neutral-100">
+                  <span className="text-neutral-500 font-mono text-xs">~{leg.estDurationHours}h</span>
+                  <span className="font-mono font-extrabold text-emerald-800 text-xs">{leg.estFareETB} ETB</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-neutral-100">
+            <div className="flex items-center gap-2">
+              {onOpenTripPlanner && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(12);
+                    onOpenTripPlanner(originStationId, destStationId);
+                  }}
+                  className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Compass className="w-4 h-4 text-amber-300" />
+                  <span>{lang === 'en' ? 'Plan & Book All Legs in Trip Planner' : 'ሁሉንም ቅብብሎች በTrip Planner ያቅዱና ይያዙ'}</span>
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setOriginStationId('');
+                setDestStationId('');
+                setSelectedVehicleType('all');
+                setCompanySearchQuery('');
+                setFilterAvailableOnly(false);
+              }}
+              className="px-4 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
+            >
+              {lang === 'en' ? 'Clear Station Selection' : 'ጣቢያዎችን አጽዳ'}
+            </button>
+          </div>
         </div>
       ) : (
         /* Empty State */
